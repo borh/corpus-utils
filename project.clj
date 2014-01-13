@@ -7,7 +7,7 @@
 
                  [clj-mecab "0.3.0"]
                  [cc.qbits/knit "0.2.1"]
-                 [d3-compat-tree "0.0.1"]
+
                  [fast-zip "0.3.0"]
                  [org.clojure/data.csv "0.1.2"]
                  [me.raynes/fs "1.4.5"]
