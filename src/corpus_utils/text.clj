@@ -74,7 +74,7 @@
 
 (sm/defn parse-document :- [UnidicMorphemeSchema]
   [doc :- DocumentSchema
-   field :- s/Keyword]
+   field :- clojure.lang.IFn]
   (->> doc
        :paragraphs
        (r/mapcat :sentences)
