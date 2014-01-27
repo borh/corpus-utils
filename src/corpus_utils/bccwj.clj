@@ -128,10 +128,10 @@
 
 (sm/defn parse-metadata :- [MetadataSchema]
   [metadata-dir :- s/Str]
-  (let [;;metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
-        metadata  (text/read-tsv (str metadata-dir "Joined_info.txt") true)
+  ;; metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
+  (let [metadata  (text/read-tsv (str metadata-dir "Joined_info.txt") true)
         copyright (into {} (text/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
-        ndc-map   (into {} (text/read-tsv "data/ndc-3digits.tsv"))
+        ndc-map   (into {} (text/read-tsv "data/ndc-3digits.tsv" false))
         c-map     (for-map [[k1 v1] (c-code "1")
                             [k2 v2] (c-code "2")
                             [k3 v3] (c-code "34")]
@@ -148,52 +148,77 @@
                    "OV" "韻文"
                    "OT" "検定教科書"
                    "OY" "Yahoo!ブログ"
-                   "OC" "Yahoo!知恵袋"}]
-    (->> metadata
-         (map
-          (fn [[basename _ title subtitle _ _ publisher year _ _
+                   "OC" "Yahoo!知恵袋"}
+
+        bccwj-metadata
+        (r/reduce
+         (r/monoid
+          (fn [m
+              [basename _ title subtitle _ _ publisher year _ _
                genre-1 genre-2 genre-3 genre-4 _ _
                author author-year author-gender corpus-name]]
-            {:title     (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
-             :author    author
-             :gender    (let [authors (string/split author-gender #"/")]
-                          (if (every? #(= (first authors) %) authors)
-                            (case (first authors)
-                              "男" :male
-                              "女" :female
-                              ""   nil
-                              :mixed)))
-             :author-year (try (Integer/parseInt author-year) (catch Exception e))
-             :publisher (if (empty? publisher) "BCCWJ" publisher)
-             :copyright (copyright basename)
-             :audience  (if (= (name-map corpus-name) "書籍") (:audience (c-map genre-3)))
-             :media     (if (= (name-map corpus-name) "書籍") (:media (c-map genre-3)))
-             :topic     (if (= (name-map corpus-name) "書籍") (:topic (c-map genre-3)))
-             :year      (Integer/parseInt year)
-             :basename  basename
-             :corpus    "BCCWJ"
-             :subcorpus corpus-name
-             ;;:subcorpus-ja (name-map corpus-name) ;; FIXME
-             :category (->> (condp re-seq corpus-name
-                              #"(L|O|P)B" (->> [genre-1 genre-2 genre-3 genre-4]
-                                               (r/map #(ndc-map % %))
-                                               (r/map #(string/replace % #"^\d\s" ""))
-                                               (r/remove #(= "分類なし" %)) ;; Should be replaced with C-CODE. FIXME ["分類なし" "8328"]
-                                               (r/remove #(re-seq #"^\d{4}$" %))
-                                               #_(r/map #(c-map % %)))
-                              #"OL" (r/map #(string/replace % #"\d\d\s" "")
-                                           [genre-1 genre-2 genre-3 genre-4])
-                              #"OT" [genre-1 (str "G" (case genre-2
-                                                        "小" (Integer/parseInt genre-3)
-                                                        "中" (+ 6 (Integer/parseInt genre-3))
-                                                        "高" 10))]
-                              [genre-1 genre-2 genre-3 genre-4])
-                            (r/remove empty?)
-                            (r/reduce (fn ;; Remove repeated categories.
-                                        ([] [])
-                                        ([a b] (if (= (peek a) b) a (conj a b)))))
-                            (concat [(name-map corpus-name)])
-                            (into []))})))))
+            (assoc m basename
+             {:title     (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
+              :author    author
+              :gender    (let [authors (string/split author-gender #"/")]
+                           (if (every? #(= (first authors) %) authors)
+                             (case (first authors)
+                               "男" :male
+                               "女" :female
+                               ""   nil
+                               :mixed)))
+              :author-year (try (Integer/parseInt author-year) (catch Exception e))
+              :publisher (if (empty? publisher) "BCCWJ" publisher)
+              :copyright (copyright basename)
+              :audience  (if (= (name-map corpus-name) "書籍") (:audience (c-map genre-3)))
+              :media     (if (= (name-map corpus-name) "書籍") (:media (c-map genre-3)))
+              :topic     (if (= (name-map corpus-name) "書籍") (:topic (c-map genre-3)))
+              :year      (Integer/parseInt year)
+              :basename  basename
+              :corpus    "BCCWJ"
+              :subcorpus corpus-name
+              ;;:subcorpus-ja (name-map corpus-name) ;; FIXME
+              :category (->> (condp re-seq corpus-name
+                               #"(L|O|P)B" (->> [genre-1 genre-2 genre-3 genre-4]
+                                                (r/map #(ndc-map % %))
+                                                (r/map #(string/replace % #"^\d\s" ""))
+                                                (r/remove #(= "分類なし" %)) ;; Should be replaced with C-CODE. FIXME ["分類なし" "8328"]
+                                                (r/remove #(re-seq #"^\d{4}$" %))
+                                                #_(r/map #(c-map % %)))
+                               #"OL" (r/map #(string/replace % #"\d\d\s" "")
+                                            [genre-1 genre-2 genre-3 genre-4])
+                               #"OT" [genre-1 (str "G" (case genre-2
+                                                         "小" (Integer/parseInt genre-3)
+                                                         "中" (+ 6 (Integer/parseInt genre-3))
+                                                         "高" 10))]
+                               [genre-1 genre-2 genre-3 genre-4])
+                             (r/remove empty?)
+                             (r/reduce (fn ;; Remove repeated categories.
+                                         ([] [])
+                                         ([a b] (if (= (peek a) b) a (conj a b)))))
+                             (concat [(name-map corpus-name)])
+                             (into []))}))
+          (fn [] {}))
+         metadata)
+
+        bccwj-meta-annotation-data (text/read-tsv "data/katarikakesei-2013.tsv" false)
+        bccwj-annotations
+        (let [header (->> bccwj-meta-annotation-data
+                          first
+                          rest)]
+          (r/fold
+           (r/monoid
+            (fn [a [basename & record]]
+              (letfn [(clean-record [r]
+                        (cond
+                         (re-seq #"^\d\s" r) (Integer/parseInt (subs r 0 1))
+                         (empty? r) nil
+                          :else r))]
+                (assoc a basename {:annotations (zipmap header (map clean-record record))})))
+            (fn [] {}))
+           (next bccwj-meta-annotation-data)))]
+
+    (vals (merge-with merge bccwj-metadata bccwj-annotations))))
 
 (comment
   (pprint (take 10 (map (comp :category :metadata) (filter #(= ((comp :subcorpus :metadata) %) "PM") (document-seq "/data/BCCWJ-2012-dvd1/DOC/" "/data/BCCWJ-2012-dvd1/C-XML/VARIABLE/")))))

@@ -63,7 +63,8 @@
    :basename  s/Str
    :corpus    s/Str
    (s/optional-key :subcorpus) s/Str
-   :category  [s/Str]})
+   :category  [s/Str]
+   (s/optional-key :annotations) {s/Str s/Any}})
 
 (def SentencesSchema
   [{:tags clojure.lang.PersistentHashSet
