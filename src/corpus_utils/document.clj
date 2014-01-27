@@ -56,6 +56,9 @@
    (s/optional-key :author-year) (s/maybe s/Int)
    :publisher s/Str
    (s/optional-key :copyright) (s/maybe s/Str)
+   :audience  (s/maybe s/Str)
+   :media     (s/maybe s/Str)
+   :topic     (s/maybe s/Str)
    :year      s/Int
    :basename  s/Str
    :corpus    s/Str
