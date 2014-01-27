@@ -10,7 +10,7 @@
             [schema.macros :as sm]
             [corpus-utils.c-code :refer [c-code]]
             [corpus-utils.text :as text]
-            [corpus-utils.document :refer [MetadataSchema DocumentSchema]]))
+            [corpus-utils.document :refer [MetadataSchema SentencesSchema]]))
 
 ;; # Importer for BCCWJ-Formatted C-XML Data
 ;;
