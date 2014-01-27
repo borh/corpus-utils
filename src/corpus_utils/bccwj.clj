@@ -153,10 +153,10 @@
          (map
           (fn [[basename _ title subtitle _ _ publisher year _ _
                genre-1 genre-2 genre-3 genre-4 _ _
-               author author-year author-sex corpus-name]]
+               author author-year author-gender corpus-name]]
             {:title     (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
              :author    author
-             :sex       (let [authors (string/split author-sex #"/")]
+             :gender    (let [authors (string/split author-gender #"/")]
                           (if (every? #(= (first authors) %) authors)
                             (case (first authors)
                               "男" :male
