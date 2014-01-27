@@ -21,7 +21,6 @@
    header? :- Boolean]
   (let [records
         (with-open [r (-> file
-                          io/file
                           io/input-stream
                           XZCompressorInputStream.
                           io/reader)]
