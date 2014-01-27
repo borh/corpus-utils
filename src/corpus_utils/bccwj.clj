@@ -115,10 +115,10 @@
 
                (= :sentence tag) ; Insert new sentence.
                (let [tag-stack (-> par-loc z/node :tag-stack)]
-                 (-> par-loc (z/edit update-in [:sentences] conj "")))
+                 (z/edit par-loc update-in [:sentences] conj ""))
 
                (string? xml-node) ; Update last-inserted sentence's text.
-               (-> par-loc (z/edit update-in [:sentences (-> par-loc z/node :sentences count dec)] #(str % xml-node)))
+               (z/edit par-loc update-in [:sentences (-> par-loc z/node :sentences count dec)] #(str % xml-node))
 
                :else par-loc)))))) ; Do nothing.
 
