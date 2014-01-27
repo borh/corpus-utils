@@ -13,10 +13,11 @@
             [clojure.core.reducers :as r]
             [clojure.java.io :as io]
             [clojure.data.csv :as csv])
-  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]))
+  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]
+           [java.net URL]))
 
 (sm/defn read-tsv-xz :- [[s/Str]]
-  [file :- s/Str
+  [file :- URL
    header? :- Boolean]
   (let [records
         (with-open [r (-> file

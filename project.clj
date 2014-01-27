@@ -1,4 +1,4 @@
-(defproject corpus-utils "0.0.4"
+(defproject corpus-utils "0.0.4.1"
   :description "Miscellaneous utilities to parse Japanese language corpora with Clojure"
   :url "https://github.com/borh/corpus-utils.git"
   :license {:name "Eclipse Public License"
@@ -17,7 +17,7 @@
                  [prismatic/schema "0.2.0"]
                  [prismatic/plumbing "0.2.0"]]
   :min-lein-version "2.0.0"
-  :resource-paths ["config", "resources"]
+  :resource-paths ["config", "resources", "data"]
   :jvm-opts ["-server"]
   :core.typed {:check [corpus-utils.document]}
   :main ^{:skip-aot true} corpus-utils.core)
