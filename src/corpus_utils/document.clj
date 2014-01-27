@@ -65,9 +65,12 @@
    (s/optional-key :subcorpus) s/Str
    :category  [s/Str]})
 
+(def SentencesSchema
+  [{:tags clojure.lang.PersistentHashSet
+    :sentences [s/Str]}])
+
 (def DocumentSchema
-  {:paragraphs [{:tags clojure.lang.PersistentHashSet
-                 :sentences [s/Str]}]
+  {:paragraphs SentencesSchema
    :metadata   MetadataSchema})
 
 (def UnidicMorphemeSchema

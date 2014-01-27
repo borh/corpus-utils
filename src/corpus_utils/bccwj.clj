@@ -207,7 +207,7 @@
   #{"情報科学" "宗教" "商業" "旅行" "物理学" "総記" "仏教" "キリスト教" "化学" "機械" "哲学" "ドイツ語" "家事" "法律" "数学" "日本語" "教育" "伝記" "社会" "生物学" "水産業"}
 )
 
-(sm/defn parse-document :- DocumentSchema
+(sm/defn parse-document :- SentencesSchema
   [filename :- s/Str]
   (->> filename
        io/input-stream
@@ -219,7 +219,7 @@
        (remove #(empty? (:sentences %))) ; Remove paragraphs with no sentences.
        vec))
 
-(sm/defn document-seq ;; TODO validate lazy-seq?
+(sm/defn document-seq ;; :- [DocumentSchema] ;; TODO validate lazy-seq?
   [metadata-dir :- s/Str
    data-dir     :- s/Str]
   (lazy-seq
