@@ -201,7 +201,7 @@
           (fn [] {}))
          metadata)
 
-        bccwj-meta-annotation-data (text/read-tsv "data/katarikakesei-2013.tsv" false)
+        bccwj-meta-annotation-data (text/read-tsv-xz "data/annotations-2013.tsv.xz" false)
         bccwj-annotations
         (let [header (->> bccwj-meta-annotation-data
                           first

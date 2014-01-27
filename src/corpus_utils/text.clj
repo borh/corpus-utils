@@ -12,7 +12,23 @@
             [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
             [clojure.core.reducers :as r]
             [clojure.java.io :as io]
-            [clojure.data.csv :as csv]))
+            [clojure.data.csv :as csv])
+  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]))
+
+(sm/defn read-tsv-xz :- [[s/Str]]
+  [file :- s/Str
+   header? :- Boolean]
+  (let [records
+        (with-open [r (-> file
+                          io/file
+                          io/input-stream
+                          XZCompressorInputStream.
+                          io/reader)]
+          (doall (csv/read-csv r :separator \tab :quote 0)))]
+    (vec
+     (if header?
+       (drop 1 records)
+       records))))
 
 (sm/defn read-tsv :- [[s/Str]]
   [file :- s/Str

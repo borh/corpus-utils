@@ -11,6 +11,7 @@
                  [fast-zip "0.3.0"]
                  [org.clojure/data.csv "0.1.2"]
                  [me.raynes/fs "1.4.5"]
+                 [org.apache.commons/commons-compress "1.7"]
 
                  [org.clojure/core.typed "0.2.21"]
                  [prismatic/schema "0.2.0"]
