@@ -16,7 +16,7 @@
 
 (sm/defn read-tsv :- [[s/Str]]
   [file :- s/Str
-   & header?]
+   header? :- Boolean]
   (let [records (with-open [r (io/reader file)]
                   (doall (csv/read-csv r :separator \tab :quote 0)))]
     (vec
