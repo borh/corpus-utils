@@ -211,9 +211,9 @@
             (fn [a [basename & record]]
               (letfn [(clean-record [r]
                         (cond
-                         (re-seq #"^\d\s" r) (Integer/parseInt (subs r 0 1))
+                         (re-seq #"^\d+" r) (Integer/parseInt (subs r 0 1))
                          (empty? r) nil
-                          :else r))]
+                         :else r))]
                 (assoc a basename (zipmap header (map clean-record record)))))
             (fn [] {}))
            (next bccwj-meta-annotation-data)))]
