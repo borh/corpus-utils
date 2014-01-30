@@ -88,13 +88,13 @@
 
 (comment (dorun (pmap parse-sentence-synchronized (repeat 10000 "Hello"))))
 
-(sm/defn parse-document :- [UnidicMorphemeSchema]
+(sm/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
   [doc :- DocumentSchema
-   field :- clojure.lang.IFn]
+   token-fn :- clojure.lang.IFn]
   (->> doc
        :paragraphs
        (r/mapcat :sentences)
        (r/map parse-sentence-synchronized)
        (r/reduce (fn ;; mecab is not thread-safe so we cannot use fold; consider core.async wrapper (using executor-based wrapper for now) (foldcat??)
                    ([] []) ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
-                   ([a b] (into a (r/map field b)))))))
+                   ([a b] (into a (r/map token-fn b)))))))
