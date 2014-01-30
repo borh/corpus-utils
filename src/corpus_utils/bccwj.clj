@@ -5,7 +5,7 @@
             [clojure.string :as string]
             [clojure.core.reducers :as r]
             [me.raynes.fs :as fs]
-            [plumbing.core :refer [for-map]]
+            [plumbing.core :refer [for-map map-vals]]
             [schema.core :as s]
             [schema.macros :as sm]
             [corpus-utils.c-code :refer [c-code]]
@@ -203,22 +203,63 @@
 
         bccwj-meta-annotation-data (text/read-tsv-xz (io/resource "annotations-2013.tsv.xz") false)
         bccwj-annotations
-        (let [header (->> bccwj-meta-annotation-data
-                          first
-                          rest)]
+        (let [header [:forward-or-afterward #_"前書きや後書きか"
+                      :dialog #_"対話系か"
+                      :quotation-type #_"引用系か"
+                      :visual #_"視覚表現多用系（図表・イラスト・写真の多用）か"
+                      :db-or-list #_"データベースやリスト系か"
+                      :archaic #_"明治時代より以前の古い言葉，古い言い回しが多いか"
+                      :foreign-language #_"外国語が多いか"
+                      :math-or-code #_"数式やプログラミング言語などが多いか"
+                      :legalese #_"法律文が多いか"
+                      :questionable-content #_"教育上のぞましくなさそうか"
+                      :low-content #_"そのほか，一定量の「本文」が認めがたいか"
+
+                      :target-audience #_"対象とする読者"
+                      :hard-soft #_"文章の硬軟"
+                      :informality #_"くだけているか"
+                      :addressing #_"文体(O)"
+
+                      :_ #_"小説の主人公あるいは語り手の人称(H)"
+                      :_ #_"小説の主人公あるいは語り手の人称(M)"
+                      :_ #_"小説の主人公あるいは語り手の人称(S)"
+                      :_ #_"小説の主人公あるいは語り手の人称(T)"
+                      :_ #_"小説の主人公あるいは語り手の人称(N)"
+
+                      :protagonist-personal-pronoun #_"小説の主人公あるいは語り手の人称"
+                      :other-addressing #_"小説以外の文章の内容"]
+              #_(->> bccwj-meta-annotation-data
+                     first
+                     rest)]
           (r/fold
            (r/monoid
             (fn [a [basename & record]]
-              (letfn [(clean-record [r]
-                        (cond
-                         (re-seq #"^\d+" r) (Integer/parseInt (subs r 0 1))
-                         (empty? r) nil
-                         :else r))]
-                (assoc a basename (zipmap header (map clean-record record)))))
+              (assoc a basename
+                     (for-map [[k v] (zipmap header record)
+                               :when (not= k :_)]
+                         k (cond (empty? v) nil
+
+                                 ;; Coerce into Likert-scale Longs.
+                                 (and (#{:target-audience :hard-soft :informality :addressing :other-addressing} k)
+                                      (re-seq #"^\d+" v))
+                                 (Long/parseLong v)
+
+                                 ;; Coerce into binary values.
+                                 (#{:forward-or-afterward :dialog
+                                     :quotation-type :visual
+                                     :db-or-list :archaic
+                                     :foreign-language :math-or-code
+                                     :legalese :questionable-content
+                                     :low-content} k)
+                                 (case (subs v 0 1) "1" true "0" false true)
+
+                                 :else v))))
             (fn [] {}))
            (next bccwj-meta-annotation-data)))]
 
-    (vals (merge-with merge bccwj-metadata bccwj-annotations))))
+    (->> (merge-with merge bccwj-metadata bccwj-annotations)
+         (map-vals (fn [vs] (into {} (r/remove #(nil? (val %)) vs))))
+         vals)))
 
 (comment
   (pprint (take 10 (map (comp :category :metadata) (filter #(= ((comp :subcorpus :metadata) %) "PM") (document-seq "/data/BCCWJ-2012-dvd1/DOC/" "/data/BCCWJ-2012-dvd1/C-XML/VARIABLE/")))))
