@@ -40,6 +40,16 @@
        (drop 1 records)
        records))))
 
+(sm/defn read-tsv-URL :- [[s/Str]]
+  [file :- URL
+   header? :- Boolean]
+  (let [records (with-open [r (io/reader (io/input-stream file))]
+                  (doall (csv/read-csv r :separator \tab :quote 0)))]
+    (vec
+     (if header?
+       (drop 1 records)
+       records))))
+
 (defn write-tsv [file-name header map-seq]
   (with-open [out-file (io/writer file-name)]
     (clojure.data.csv/write-csv out-file [header] :separator \tab) ; header

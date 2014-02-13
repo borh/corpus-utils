@@ -131,7 +131,7 @@
   ;; metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
   (let [metadata  (text/read-tsv (str metadata-dir "Joined_info.txt") true)
         copyright (into {} (text/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
-        ndc-map   (into {} (text/read-tsv "data/ndc-3digits.tsv" false))
+        ndc-map   (into {} (text/read-tsv-URL (io/resource "ndc-3digits.tsv") false))
         c-map     (for-map [[k1 v1] (c-code "1")
                             [k2 v2] (c-code "2")
                             [k3 v3] (c-code "34")]
