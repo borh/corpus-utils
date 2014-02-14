@@ -1,53 +1,6 @@
 (ns corpus-utils.document
-  (:require [clojure.core.typed :as t]
-            [schema.core :as s]
+  (:require [schema.core :as s]
             [schema.macros :as sm]))
-
-(t/def-alias Gender
-  "Author gender. In the case of multiple authors with male and female members, we assign a :mixed value."
-  (U ':male ':female ':mixed))
-
-(t/def-alias Metadata "Metadata"
-  (HMap :mandatory {:title     String
-                    :author    String
-                    :publisher String
-                    :year      Number
-                    :basename  String
-                    :corpus    String
-                    :category  (t/Vec String)}
-        :optional {:gender Gender
-                   :author-year  Number
-                   :distribution String ;; -> 月刊/週刊...
-                   :copyright    String
-                   :subcorpus    String
-                   :subcorpus-ja String}
-        :complete? true))
-
-(t/def-alias Document "Document"
-  (U Metadata
-     (HMap :mandatory {:tags (t/Set String) ;; FIXME What are tags here?
-                       :sentences (t/Vec String)}
-           :complete? true)))
-
-(t/def-alias UnidicMorpheme "UnidicMorpheme"
-  (HMap :mandatory {:pos-1 String
-                    :pos-2 String
-                    :pos-3 String
-                    :pos-4 String
-                    :c-type String
-                    :c-form String
-                    :l-form String
-                    :lemma String
-                    :orth String
-                    :pron String
-                    :orth-base String
-                    :pron-base String
-                    :goshu String}
-        :optional {:i-type String
-                   :i-form String
-                   :f-type String
-                   :f-form String}
-        :complete? true))
 
 (def BCCWJAnnotationSchema
   {(s/optional-key :forward-or-afterward) Boolean
@@ -112,6 +65,3 @@
    :i-form s/Str
    :f-type s/Str
    :f-form s/Str})
-
-(comment
-  (t/check-ns))

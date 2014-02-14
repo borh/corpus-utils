@@ -13,9 +13,8 @@
                  [me.raynes/fs "1.4.5"]
                  [org.apache.commons/commons-compress "1.7"]
 
-                 [org.clojure/core.typed "0.2.21"]
                  [prismatic/schema "0.2.0"]
-                 [prismatic/plumbing "0.2.0"]]
+                 [prismatic/plumbing "0.2.1"]]
   :min-lein-version "2.0.0"
   :resource-paths ["data"]
   :jvm-opts ["-server"]
