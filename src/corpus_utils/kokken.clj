@@ -127,7 +127,7 @@
 
 (sm/defn document-seq
   [data-dir :- s/Str]
-  (->> (fs/glob data-dir "/*.xml")
+  (->> (fs/glob (str data-dir "/*.xml"))
        (map parse)))
 
 ;;(parse "/data/taiyo-corpus/XML/t189506.xml")
