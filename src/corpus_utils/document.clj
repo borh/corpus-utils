@@ -36,7 +36,7 @@
           :year      s/Int
           :basename  s/Str
           :corpus    s/Str
-          :subcorpus s/Str
+          (s/optional-key :subcorpus) s/Str
           :category  [s/Str]}))
 
 (def SentencesSchema
