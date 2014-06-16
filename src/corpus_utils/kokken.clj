@@ -1,6 +1,7 @@
 (ns corpus-utils.kokken
   (:require [clojure.zip :as z]
             [clojure.xml :as xml]
+            [clojure.string :as str]
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
             [schema.core :as s]
@@ -19,7 +20,7 @@
 ;;      {:tags #{ ... },
 ;;       :sentences [ ... ]}]
 
-(defn- backtrack-with-distance
+#_(defn- backtrack-with-distance
   "Modified from `clojure.zip/next` source. Like zip/next, but also keeps track of how far up the tree it goes."
   [loc]
   (loop [p loc
@@ -65,10 +66,33 @@
 
                :else par-loc)))))) ; Do nothing.
 
-(defn parse;; :- [DocumentSchema]
+;; TODO: Turn <引用 種別="記事説明" 話者="記者"> into tags!
+;; Refactor to BCCWJ format. (+ look for more elegant ways to get at this hierarchical data)
+(sm/defn partition-by-paragraph :- [[s/Str]]
+  [m :- s/Any #_{:tag s/Keyword :content s/Any}]
+  (->> m ;; Reset zipper root node to current loc.
+       z/node
+       z/xml-zip
+       (iterate z/next)
+       (take-while (complement z/end?))
+       (partition-by #(= (:tag (z/node %)) :br))
+       (map #(->> %
+                  (partition-by (fn [m] (= :s (:tag (z/node m)))))
+                  (map (fn [sentences]
+                         (->> sentences
+                              (filter (comp string? z/node))
+                              ;; Remove extra spaces from XML. (FIXME)
+                              (map (comp (fn [s] (str/replace s " " "")) first))
+                              str/join)))
+                  (remove empty?)
+                  (into [])))
+       (remove empty?)
+       (into [])
+       #_((fn [a] (doto a println)))))
+
+(sm/defn parse :- [DocumentSchema]
   "Each XML file from The Sun corpus contains several articles, so we return a vector of documents."
-  [filename;; :- s/Str
-  ]
+  [filename :- s/Str]
   (let [root-loc (-> filename
                      io/input-stream
                      xml/parse
@@ -77,26 +101,29 @@
     (->> root-loc
          z/down ;; Descend to the :記事 level.
          (iterate z/right) ;; FIXME broken
-         (take 1)
+         ;;(take 2)
          ;; Documents can be empty...
          (remove nil?)
-         #_(map (fn [article-loc]
+         (map (fn [article-loc]
                 (let [[title author title-alt style genre] ((juxt :題名 :著者 :欄名 :文体 :ジャンル) (:attrs (z/node article-loc)))]
                   {:paragraphs
-                   #_:TODO (->> article-loc
-                                z/down
-                                (iterate z/right)
-                                (remove nil?)
-                                (partition-by #(if (= (:tag (z/node %)) :br) true))
-                                (map :content))
+                   (->> article-loc
+                        z/down
+                        (iterate z/right)
+                        (take-while (complement nil?))
+                        ;;(take 50)
+                        (mapcat partition-by-paragraph)
+                        (map (fn [text] {:tags #{}
+                                        :sentences text}))
+                        (into []))
                    :metadata
                    {:title     title
                     :author    author
                     :publisher corpus
-                    :year      year
+                    :year      (Integer/parseInt year)
                     :basename  (fs/base-name filename ".xml")
                     :corpus    corpus
-                    :genre     [corpus genre]}}))))))
+                    :category  [corpus genre]}}))))))
 
 (sm/defn document-seq
   [data-dir :- s/Str]
@@ -104,6 +131,7 @@
        (map parse)))
 
 ;;(parse "/data/taiyo-corpus/XML/t189506.xml")
+;;(sm/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml"))
 
 (comment
   (sm/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml")))
