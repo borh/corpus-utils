@@ -10,8 +10,8 @@
                  [fast-zip "0.4.0"]
                  [org.clojure/data.csv "0.1.2"]
                  [me.raynes/fs "1.4.5"]
-                 [org.apache.commons/commons-compress "1.8.1"]
-                 [org.tukaani/xz "1.5"]
+                 [org.apache.commons/commons-compress "1.6"]
+                 ;;[org.tukaani/xz "1.5"]
                  ;;[http-kit "2.1.18"]
 
                  [prismatic/schema "0.2.3"]
