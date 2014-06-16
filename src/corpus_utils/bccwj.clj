@@ -4,7 +4,7 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.core.reducers :as r]
-            [me.raynes.fs :as fs]
+            ;;[org.httpkit.client :as http]
             [plumbing.core :refer [for-map map-vals]]
             [schema.core :as s]
             [schema.macros :as sm]
@@ -126,6 +126,23 @@
 ;;
 ;; Metadata is not contained in the XML files and must be read from the Joined_info.zip (CSV) file distributed with the BCCWJ 1.0 DVD.
 
+
+;; # ISBN metadata search
+;;
+;; This should only be run once to generate a static file, with (perhaps) regular updates, if it makes sense for some types of metadata that could perhaps change.
+;; What we're after: http://iss.ndl.go.jp/books/R100000002-I000001786643-00.json
+(comment
+  (def isbns (take 1 (map #(nth % 8) (text/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))))
+  (take 1 (text/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))
+  isbns
+
+  (defn query-ndl [isbn]
+    (let [options {:form-params {:name "http-kit" :features ["async" "client" "server"]}}
+          {:keys [status error]} @(http/post "http://iss.ndl.go.jp/api/opensearch?isbn=4795274053" options)]
+      (if error
+        (println "Failed, exception is " error)
+        (println "Async HTTP POST: " status)))))
+
 (sm/defn parse-metadata :- [MetadataSchema]
   [metadata-dir :- s/Str]
   ;; metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
@@ -154,7 +171,7 @@
         (r/reduce
          (r/monoid
           (fn [m
-              [basename _ title subtitle _ _ publisher year _ _
+              [basename _ title subtitle _ _ publisher year isbn _
                genre-1 genre-2 genre-3 genre-4 _ _
                author author-year author-gender corpus-name]]
             (assoc m basename

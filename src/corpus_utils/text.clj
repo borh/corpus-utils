@@ -2,13 +2,6 @@
   (:require [schema.core :as s]
             [schema.macros :as sm]
             [clj-mecab.parse :as parse]
-
-            [qbits.knit :as knit]
-
-            ;; [clojure.core.async.impl.concurrent :as conc]
-            ;; [clojure.core.async.impl.exec.threadpool :as tp]
-            ;; [clojure.core.async :as async]
-
             [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
             [clojure.core.reducers :as r]
             [clojure.java.io :as io]
@@ -69,34 +62,6 @@
     (doseq [[k vs] map-seq]
       (clojure.data.csv/write-csv out-file [(apply conj k (for [sh sparse-header] (get vs sh 0.0)))] :separator \tab))))
 
-(comment
-  (defonce my-executor
-    (java.util.concurrent.Executors/newFixedThreadPool
-     1
-     (conc/counted-thread-factory "my-async-dispatch-%d" true)))
-
-  (alter-var-root #'clojure.core.async.impl.dispatch/executor
-                  (constantly (delay (tp/thread-pool-executor my-executor)))))
-
-(defn callable-parse-sentence [^String s]
-  (cast Callable (fn [] (parse/parse-sentence s))))
-(defn mecab-thread-factory
-  "Returns a new ThreadFactory instance wrapped with a new MeCab instance."
-  [thread-group]
-  (reify java.util.concurrent.ThreadFactory
-    (newThread [_ f]
-      (doto (Thread. ^ThreadGroup thread-group ^Runnable f)
-        (.setDaemon true)))))
-(def mecab-executor
-  (knit/executor :fixed
-                 :num-threads 1
-                 :thread-factory (mecab-thread-factory (knit/thread-group "mecab-thread"))))
-
-(defn parse-sentence-synchronized [^String s]
-  @(knit/execute mecab-executor
-                 (callable-parse-sentence s)))
-
-(comment (dorun (pmap parse-sentence-synchronized (repeat 10000 "Hello"))))
 
 (sm/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
   [doc :- DocumentSchema
@@ -104,7 +69,7 @@
   (->> doc
        :paragraphs
        (r/mapcat :sentences)
-       (r/map parse-sentence-synchronized)
+       (r/map parse/parse-sentence)
        (r/reduce (fn ;; mecab is not thread-safe so we cannot use fold; consider core.async wrapper (using executor-based wrapper for now) (foldcat??)
                    ([] []) ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
                    ([a b] (into a (r/map token-fn b)))))))
