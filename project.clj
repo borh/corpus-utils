@@ -1,4 +1,4 @@
-(defproject corpus-utils "0.1.0"
+(defproject corpus-utils "0.1.1"
   :description "Miscellaneous utilities to parse Japanese language corpora with Clojure"
   :url "https://github.com/borh/corpus-utils.git"
   :license {:name "Eclipse Public License"
