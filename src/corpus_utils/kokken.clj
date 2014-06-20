@@ -6,6 +6,7 @@
             [me.raynes.fs :as fs]
             [schema.core :as s]
             [schema.macros :as sm]
+            [corpus-utils.text :as text]
             [corpus-utils.document :refer [DocumentSchema]]))
 
 ;; :sentence -> :s
@@ -90,9 +91,37 @@
        (into [])
        #_((fn [a] (doto a println)))))
 
-(sm/defn parse :- [DocumentSchema]
+(defonce ndc-map (into {} (text/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
+
+(sm/defn parse-document :- DocumentSchema
+  [corpus :- s/Str
+   year :- s/Str
+   number :- s/Str
+   filename :- java.io.File
+   article-loc :- s/Any #_{:tag s/Keyword :content s/Any :attrs s/Any}]
+  (let [[title author title-alt style genre] ((juxt :題名 :著者 :欄名 :文体 :ジャンル) (:attrs (z/node article-loc)))]
+    {:paragraphs
+     (->> article-loc
+          z/down
+          (iterate z/right)
+          (take-while (complement nil?))
+          ;;(take 2)
+          (mapcat partition-by-paragraph)
+          (map (fn [text] {:tags #{}
+                          :sentences text}))
+          (into []))
+     :metadata
+     {:title     title
+      :author    author
+      :publisher corpus
+      :year      (Integer/parseInt year)
+      :basename  (fs/base-name filename ".xml")
+      :corpus    corpus
+      :category  [(get ndc-map (str/replace genre #"^NDC" "") "分類なし")]}}))
+
+(sm/defn parse-document-seq :- [DocumentSchema]
   "Each XML file from The Sun corpus contains several articles, so we return a vector of documents."
-  [filename :- s/Str]
+  [filename :- java.io.File]
   (let [root-loc (-> filename
                      io/input-stream
                      xml/parse
@@ -100,35 +129,16 @@
         [corpus year number] ((juxt :雑誌名 :年 :号) (-> root-loc z/node :attrs ))]
     (->> root-loc
          z/down ;; Descend to the :記事 level.
-         (iterate z/right) ;; FIXME broken
-         ;;(take 2)
+         (iterate z/right) ;; FIXME broken. Should be a lazyseq of documents
          ;; Documents can be empty...
          (remove nil?)
-         (map (fn [article-loc]
-                (let [[title author title-alt style genre] ((juxt :題名 :著者 :欄名 :文体 :ジャンル) (:attrs (z/node article-loc)))]
-                  {:paragraphs
-                   (->> article-loc
-                        z/down
-                        (iterate z/right)
-                        (take-while (complement nil?))
-                        ;;(take 50)
-                        (mapcat partition-by-paragraph)
-                        (map (fn [text] {:tags #{}
-                                        :sentences text}))
-                        (into []))
-                   :metadata
-                   {:title     title
-                    :author    author
-                    :publisher corpus
-                    :year      (Integer/parseInt year)
-                    :basename  (fs/base-name filename ".xml")
-                    :corpus    corpus
-                    :category  [corpus genre]}}))))))
+         (take 5)
+         (map (partial parse-document corpus year number filename)))))
 
 (sm/defn document-seq
   [data-dir :- s/Str]
   (->> (fs/glob (str data-dir "/*.xml"))
-       (map parse)))
+       (mapcat parse-document-seq)))
 
 ;;(parse "/data/taiyo-corpus/XML/t189506.xml")
 ;;(sm/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml"))
