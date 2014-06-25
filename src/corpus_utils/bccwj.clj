@@ -1,5 +1,6 @@
 (ns corpus-utils.bccwj
-  (:require [clojure.zip :as z]
+  (:require ;;[clojure.zip :as z]
+            [fast-zip.core :as fz]
             [clojure.xml :as xml]
             [clojure.java.io :as io]
             [clojure.string :as string]
@@ -10,7 +11,8 @@
             [schema.macros :as sm]
             [corpus-utils.c-code :refer [c-code]]
             [corpus-utils.text :as text]
-            [corpus-utils.document :refer [MetadataSchema SentencesSchema]]))
+            [corpus-utils.document :refer [MetadataSchema SentencesSchema]])
+  (:import [fast_zip.core ZipperLocation]))
 
 ;; # Importer for BCCWJ-Formatted C-XML Data
 ;;
@@ -74,33 +76,34 @@
 ;;      {:tags #{ ... },
 ;;       :sentences [ ... ]}]
 
-(defn- backtrack-with-distance
-  "Modified from `clojure.zip/next` source. Like zip/next, but also keeps track of how far up the tree it goes."
-  [loc]
+(sm/defn backtrack-with-distance :- {:loc ZipperLocation :depth s/Num}
+  "Modified from `fast-zip.core/next` source. Like zip/next, but also keeps track of how far up the tree it goes."
+  [loc :- ZipperLocation]
   (loop [p loc
          depth 0]
-    (if (z/up p)
-      (or (if-let [r (z/right (z/up p))] [r (inc depth)]) (recur (z/up p) (inc depth)))
-      [[(z/node p) :end] depth])))
+    (if (and (not (identical? :end (.path p))) (fz/up p))
+      (or (if-let [r (fz/right (fz/up p))] {:loc r :depth (inc depth)}) (recur (fz/up p) (inc depth)))
+      {:loc (ZipperLocation. (.branch? loc) (.children loc) (.make-node loc) (.node p) :end)
+       :depth depth})))
 
 ;; FIXME break into emitter and consume-sequence-and-build-sentences functions; naming: next-direction conflates direction and depth
 
-(defn walk-and-emit
+(sm/defn walk-and-emit
   "Traverses xml-data (parsed with clojure.xml/parse or clojure.data.xml/parse) using a zipper and incrementally builds up and returns the document as a vector of maps (representing paragraphs), each element of which contains tags and a vector of sentences."
   [xml-data]
-  (loop [xml-loc (z/xml-zip xml-data)
+  (loop [xml-loc (fz/xml-zip xml-data)
          tag-stack []
-         par-loc (z/down (z/vector-zip [{:tags [] :sentences []}]))]
-    (if (z/end? xml-loc)
-      (z/root par-loc)
-      (let [xml-node (z/node xml-loc)
+         par-loc (fz/down (fz/vector-zip [{:tags [] :sentences []}]))]
+    (if (fz/end? xml-loc)
+      (fz/root par-loc)
+      (let [xml-node (fz/node xml-loc)
             tag (:tag xml-node)
-            xml-loc-down  (and (z/branch? xml-loc) (z/down xml-loc))
-            xml-loc-right (and (not xml-loc-down) (z/right xml-loc))
+            xml-loc-down  (and (fz/branch? xml-loc) (fz/down xml-loc))
+            xml-loc-right (and (not xml-loc-down) (fz/right xml-loc))
             xml-loc-up    (and (not xml-loc-down) (not xml-loc-right) (backtrack-with-distance xml-loc)) ; At lowest depth for this paragraph.
             next-direction (cond xml-loc-down :down
                                  xml-loc-right :same
-                                 :else (second xml-loc-up))
+                                 :else (:depth xml-loc-up))
             coded-tag (if (#{:speech :speaker :title :titleBlock :orphanedTitle :list :caption :citation :quotation :OCAnswer :OCQuestion} tag)
                         (tag {:titleBlock :title :orphanedTitle :title} tag))
             new-tag-stack (case next-direction
@@ -108,17 +111,17 @@
                             :same (if (= :br tag) tag-stack (conj (pop tag-stack) coded-tag)) ; :br is an exception as a paragraph break, as it does not increase XML tree depth
                             ((apply comp (repeat next-direction pop)) tag-stack))] ; Discard equal to up depth.
         (recur
-         (or xml-loc-down xml-loc-right (first xml-loc-up)) ; Same as (z/next xml-loc).
+         (or xml-loc-down xml-loc-right (:loc xml-loc-up)) ; Same as (fz/next xml-loc).
          new-tag-stack
          (cond (paragraph-level-tags tag) ; Insert new paragraph, inserting the new tag stack.
-               (-> par-loc (z/insert-right {:tags new-tag-stack :sentences [""]}) z/right)
+               (-> par-loc (fz/insert-right {:tags new-tag-stack :sentences [""]}) fz/right)
 
                (= :sentence tag) ; Insert new sentence.
-               (let [tag-stack (-> par-loc z/node :tag-stack)]
-                 (z/edit par-loc update-in [:sentences] conj ""))
+               (let [tag-stack (-> par-loc fz/node :tag-stack)]
+                 (fz/edit par-loc update-in [:sentences] conj ""))
 
                (string? xml-node) ; Update last-inserted sentence's text.
-               (z/edit par-loc update-in [:sentences (-> par-loc z/node :sentences count dec)] #(str % xml-node))
+               (fz/edit par-loc update-in [:sentences (-> par-loc fz/node :sentences count dec)] #(str % xml-node))
 
                :else par-loc)))))) ; Do nothing.
 
