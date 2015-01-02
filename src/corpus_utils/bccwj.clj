@@ -12,13 +12,24 @@
             [corpus-utils.c-code :refer [c-code]]
             [corpus-utils.text :as text]
             [corpus-utils.document :refer [MetadataSchema SentencesSchema]])
-  (:import [fast_zip.core ZipperLocation]))
+  (:import [fast_zip.core ZipperLocation]
+           [java.util.zip ZipFile ZipEntry]))
 
 ;; # Importer for BCCWJ-Formatted C-XML Data
 ;;
 ;; Imports C-XML-type data.
 ;; M-XML is also supported, but is not recommended as we do our own parsing.
-;;
+
+
+;; ## Utility functions
+;; TODO integration
+(sm/defn walk-zip-files
+  [zip-name :- java.io.File]
+  (let [z (ZipFile. zip-name)]
+    (for [e (enumeration-seq (.entries z))
+          :when (not (.isDirectory ^ZipEntry e))]
+      (.getInputStream z e))))
+
 ;; ## XML Tags
 ;;
 ;; Definition of XML tags that trigger a paragraph break.
