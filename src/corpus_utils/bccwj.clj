@@ -8,7 +8,6 @@
             ;;[org.httpkit.client :as http]
             [plumbing.core :refer [for-map map-vals]]
             [schema.core :as s]
-            [schema.macros :as sm]
             [corpus-utils.c-code :refer [c-code]]
             [corpus-utils.text :as text]
             [corpus-utils.document :refer [MetadataSchema SentencesSchema]])
@@ -23,7 +22,7 @@
 
 ;; ## Utility functions
 ;; TODO integration
-(sm/defn walk-zip-files
+(s/defn walk-zip-files
   [zip-name :- java.io.File]
   (let [z (ZipFile. zip-name)]
     (for [e (enumeration-seq (.entries z))
@@ -87,7 +86,7 @@
 ;;      {:tags #{ ... },
 ;;       :sentences [ ... ]}]
 
-(sm/defn backtrack-with-distance :- {:loc ZipperLocation :depth s/Num}
+(s/defn backtrack-with-distance :- {:loc ZipperLocation :depth s/Num}
   "Modified from `fast-zip.core/next` source. Like zip/next, but also keeps track of how far up the tree it goes."
   [loc :- ZipperLocation]
   (loop [p loc
@@ -99,7 +98,7 @@
 
 ;; FIXME break into emitter and consume-sequence-and-build-sentences functions; naming: next-direction conflates direction and depth
 
-(sm/defn walk-and-emit
+(s/defn walk-and-emit
   "Traverses xml-data (parsed with clojure.xml/parse or clojure.data.xml/parse) using a zipper and incrementally builds up and returns the document as a vector of maps (representing paragraphs), each element of which contains tags and a vector of sentences."
   [xml-data]
   (loop [xml-loc (fz/xml-zip xml-data)
@@ -157,7 +156,7 @@
         (println "Failed, exception is " error)
         (println "Async HTTP POST: " status)))))
 
-(sm/defn parse-metadata :- [MetadataSchema]
+(s/defn parse-metadata :- [MetadataSchema]
   [metadata-dir :- s/Str]
   ;; metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
   (let [metadata  (text/read-tsv (str metadata-dir "Joined_info.txt") true)
@@ -304,7 +303,7 @@
   #{"情報科学" "宗教" "商業" "旅行" "物理学" "総記" "仏教" "キリスト教" "化学" "機械" "哲学" "ドイツ語" "家事" "法律" "数学" "日本語" "教育" "伝記" "社会" "生物学" "水産業"}
 )
 
-(sm/defn parse-document :- SentencesSchema
+(s/defn parse-document :- SentencesSchema
   [filename :- s/Str]
   (->> filename
        io/input-stream
@@ -316,7 +315,7 @@
        (remove #(empty? (:sentences %))) ; Remove paragraphs with no sentences.
        vec))
 
-(sm/defn document-seq ;; :- [DocumentSchema] ;; TODO validate lazy-seq?
+(s/defn document-seq ;; :- [DocumentSchema] ;; TODO validate lazy-seq?
   [metadata-dir :- s/Str
    data-dir     :- s/Str]
   (lazy-seq
@@ -327,5 +326,5 @@
                   :paragraphs (parse-document filename)}))))))
 
 (comment
-  (sm/with-fn-validation
+  (s/with-fn-validation
    (take 10 (map (comp :category :metadata) (document-seq "/data/BCCWJ-2012-dvd1/DOC/" "/data/BCCWJ-2012-dvd1/C-XML/VARIABLE/")))))

@@ -1,6 +1,5 @@
 (ns corpus-utils.text
   (:require [schema.core :as s]
-            [schema.macros :as sm]
             [clj-mecab.parse :as parse]
             [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
             [clojure.core.reducers :as r]
@@ -9,7 +8,7 @@
   (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]
            [java.net URL]))
 
-(sm/defn read-tsv-xz :- [[s/Str]]
+(s/defn read-tsv-xz :- [[s/Str]]
   [file :- URL
    header? :- Boolean]
   (let [records
@@ -23,7 +22,7 @@
        (drop 1 records)
        records))))
 
-(sm/defn read-tsv :- [[s/Str]]
+(s/defn read-tsv :- [[s/Str]]
   [file :- s/Str
    header? :- Boolean]
   (let [records (with-open [r (io/reader file)]
@@ -33,7 +32,7 @@
        (drop 1 records)
        records))))
 
-(sm/defn read-tsv-URL :- [[s/Str]]
+(s/defn read-tsv-URL :- [[s/Str]]
   [file :- URL
    header? :- Boolean]
   (let [records (with-open [r (io/reader (io/input-stream file))]
@@ -63,7 +62,7 @@
       (clojure.data.csv/write-csv out-file [(apply conj k (for [sh sparse-header] (get vs sh 0.0)))] :separator \tab))))
 
 
-(sm/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
+(s/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
   [doc :- DocumentSchema
    token-fn :- clojure.lang.IFn]
   (->> doc

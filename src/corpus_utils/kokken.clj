@@ -5,7 +5,6 @@
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
             [schema.core :as s]
-            [schema.macros :as sm]
             [corpus-utils.text :as text]
             [corpus-utils.document :refer [DocumentSchema]])
   (:import [fast_zip.core ZipperLocation]))
@@ -22,7 +21,7 @@
 ;;      {:tags #{ ... },
 ;;       :sentences [ ... ]}]
 
-(sm/defn filter-sentences :- s/Str
+(s/defn filter-sentences :- s/Str
   [sentences-loc :- [ZipperLocation]]
   (->> sentences-loc
        (map fz/node)
@@ -33,7 +32,7 @@
 
 ;; TODO: Turn <引用 種別="記事説明" 話者="記者"> into tags!
 ;; Refactor to BCCWJ format. (+ look for more elegant ways to get at this hierarchical data)
-(sm/defn partition-by-paragraph :- [[s/Str]]
+(s/defn partition-by-paragraph :- [[s/Str]]
   [m :- ZipperLocation]
   (->> m ;; Reset zipper root node to current loc.
        fz/node
@@ -52,7 +51,7 @@
 
 (defonce ndc-map (into {} (text/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
 
-(sm/defn parse-document :- DocumentSchema
+(s/defn parse-document :- DocumentSchema
   [corpus :- s/Str
    year :- s/Str
    number :- s/Str
@@ -78,7 +77,7 @@
       :corpus    corpus
       :category  [(get ndc-map (str/replace genre #"^NDC" "") "分類なし")]}}))
 
-(sm/defn parse-document-seq :- [DocumentSchema]
+(s/defn parse-document-seq :- [DocumentSchema]
   "Each XML file from The Sun corpus contains several articles, so we return a vector of documents."
   [filename :- java.io.File]
   (let [root-loc (-> filename
@@ -94,10 +93,10 @@
          (map fz/xml-zip)
          (map (partial parse-document corpus year number filename)))))
 
-(sm/defn document-seq
+(s/defn document-seq
   [data-dir :- s/Str]
   (->> (fs/glob (str data-dir "/*.xml"))
        (mapcat parse-document-seq)))
 
 (comment
-  (sm/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml")))
+  (s/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml")))
