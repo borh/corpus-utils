@@ -93,7 +93,7 @@
          depth 0]
     (if (and (not (identical? :end (.path p))) (fz/up p))
       (or (if-let [r (fz/right (fz/up p))] {:loc r :depth (inc depth)}) (recur (fz/up p) (inc depth)))
-      {:loc (ZipperLocation. (.branch? loc) (.children loc) (.make-node loc) (.node p) :end)
+      {:loc (ZipperLocation. (.ops loc) (.node loc) :end)
        :depth depth})))
 
 ;; FIXME break into emitter and consume-sequence-and-build-sentences functions; naming: next-direction conflates direction and depth
