@@ -24,7 +24,6 @@
 (def MetadataSchema
   "Schema of a document's possible metadata"
   (merge BCCWJAnnotationSchema
-         {}
          {:title     s/Str
           :author    s/Str
           (s/optional-key :gender) (s/enum :male :female :mixed)
