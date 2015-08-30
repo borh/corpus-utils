@@ -3,6 +3,7 @@
   :url "https://github.com/borh/corpus-utils.git"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+<<<<<<< HEAD
   :dependencies [[org.clojure/clojure "1.7.0"]
 
                  [clj-mecab "0.4.1.4"]
@@ -12,10 +13,9 @@
                  [me.raynes/fs "1.4.6"]
                  [org.apache.commons/commons-compress "1.10"]
                  [org.tukaani/xz "1.5"]
-
                  [prismatic/schema "1.0.0-alpha1"]
                  [prismatic/plumbing "0.4.4"]]
   :min-lein-version "2.0.0"
   :resource-paths ["data"]
   :jvm-opts ["-server"]
-  :main ^{:skip-aot true} corpus-utils.text)
+  :main corpus-utils.text)
