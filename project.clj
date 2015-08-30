@@ -1,9 +1,8 @@
-(defproject corpus-utils "0.1.6"
+(defproject corpus-utils "0.1.7"
   :description "Miscellaneous utilities to parse Japanese language corpora with Clojure"
   :url "https://github.com/borh/corpus-utils.git"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-<<<<<<< HEAD
   :dependencies [[org.clojure/clojure "1.7.0"]
 
                  [clj-mecab "0.4.1.4"]
