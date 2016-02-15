@@ -93,10 +93,10 @@
          (map fz/xml-zip)
          (map (partial parse-document corpus year number filename)))))
 
-(s/defn document-seq
+(s/defn document-seq :- [DocumentSchema]
   [data-dir :- s/Str]
   (->> (fs/glob (str data-dir "/*.xml"))
        (mapcat parse-document-seq)))
 
 (comment
-  (s/with-fn-validation (parse "/data/taiyo-corpus/XML/t189506.xml")))
+  (s/with-fn-validation (parse-document-seq "/data/taiyo-corpus/XML/t189506.xml")))
