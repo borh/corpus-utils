@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
             [schema.core :as s]
-            [corpus-utils.text :as text]
+            [corpus-utils.utils :as utils]
             [corpus-utils.document :refer [DocumentSchema]])
   (:import [fast_zip.core ZipperLocation]))
 
@@ -49,7 +49,7 @@
        (into [])
        #_((fn [a] (doto a println)))))
 
-(defonce ndc-map (into {} (text/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
+(defonce ndc-map (into {} (utils/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
 
 (s/defn parse-document :- DocumentSchema
   [corpus :- s/Str

@@ -9,7 +9,7 @@
             [plumbing.core :refer [for-map map-vals]]
             [schema.core :as s]
             [corpus-utils.c-code :refer [c-code]]
-            [corpus-utils.text :as text]
+            [corpus-utils.utils :as utils]
             [corpus-utils.document :refer [MetadataSchema SentencesSchema]])
   (:import [fast_zip.core ZipperLocation]
            [java.util.zip ZipFile ZipEntry]))
@@ -145,8 +145,8 @@
 ;; This should only be run once to generate a static file, with (perhaps) regular updates, if it makes sense for some types of metadata that could perhaps change.
 ;; What we're after: http://iss.ndl.go.jp/books/R100000002-I000001786643-00.json
 (comment
-  (def isbns (take 1 (map #(nth % 8) (text/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))))
-  (take 1 (text/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))
+  (def isbns (take 1 (map #(nth % 8) (utils/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))))
+  (take 1 (utils/read-tsv (str "/data/BCCWJ-2012-dvd1/DOC/" "Joined_info.txt") true))
   isbns
 
   (defn query-ndl [isbn]
@@ -159,9 +159,9 @@
 (s/defn parse-metadata :- [MetadataSchema]
   [metadata-dir :- s/Str]
   ;; metadata-dir "/data/BCCWJ-2012-dvd1/DOC/"
-  (let [metadata  (text/read-tsv (str metadata-dir "Joined_info.txt") true)
-        copyright (into {} (text/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
-        ndc-map   (into {} (text/read-tsv-URL (io/resource "ndc-3digits.tsv") false))
+  (let [metadata  (utils/read-tsv (str metadata-dir "Joined_info.txt") true)
+        copyright (into {} (utils/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
+        ndc-map   (into {} (utils/read-tsv-URL (io/resource "ndc-3digits.tsv") false))
         c-map     (for-map [[k1 v1] (c-code "1")
                             [k2 v2] (c-code "2")
                             [k3 v3] (c-code "34")]
@@ -231,7 +231,7 @@
           (fn [] {}))
          metadata)
 
-        bccwj-meta-annotation-data (text/read-tsv-xz (io/resource "annotations-2013.tsv.xz") false)
+        bccwj-meta-annotation-data (utils/read-tsv-xz (io/resource "annotations-2013.tsv.xz") false)
         bccwj-annotations
         (let [header [:forward-or-afterward #_"前書きや後書きか"
                       :dialog #_"対話系か"
