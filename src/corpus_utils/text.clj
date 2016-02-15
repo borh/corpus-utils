@@ -3,72 +3,106 @@
             [clj-mecab.parse :as parse]
             [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
             [clojure.core.reducers :as r]
-            [clojure.java.io :as io]
-            [clojure.data.csv :as csv])
-  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]
-           [java.net URL]))
+            [clojure.string :as string]))
 
-(s/defn read-tsv-xz :- [[s/Str]]
-  [file :- URL
-   header? :- Boolean]
-  (let [records
-        (with-open [r (-> file
-                          io/input-stream
-                          XZCompressorInputStream.
-                          io/reader)]
-          (doall (csv/read-csv r :separator \tab :quote 0)))]
-    (vec
-     (if header?
-       (drop 1 records)
-       records))))
+;; # Sentence and paragraph splitting
+(def delimiter   #"[\.!\?．。！？]")
+;; Take care not to use this with JStage data -- temporary hack for BCCWJ
+(comment (def delimiter-2 #"[!\?。！？]"))
+(def closing-quotation #"[\)）」』】］〕〉》\]]") ; TODO
+(def opening-quotation #"[\(（「『［【〔〈《\[]") ; TODO
+(def numbers #"[０-９\d]")
+;;(def alphanumerics #"[0-9\uFF10-\uFF19a-zA-Z\uFF41-\uFF5A\uFF21-\uFF3A]")
+(def alphanumerics #"[\d０-９a-zA-Zａ-ｚＡ-Ｚ]")
 
-(s/defn read-tsv :- [[s/Str]]
-  [file :- s/Str
-   header? :- Boolean]
-  (let [records (with-open [r (io/reader file)]
-                  (doall (csv/read-csv r :separator \tab :quote 0)))]
-    (vec
-     (if header?
-       (drop 1 records)
-       records))))
+(comment
+  (def sentence-split-re
+    (re-pattern
+     (format "(?<=%s+)(?!%s+|%s+)"
+             delimiter-2
+             closing-quotation
+             alphanumerics))))
 
-(s/defn read-tsv-URL :- [[s/Str]]
-  [file :- URL
-   header? :- Boolean]
-  (let [records (with-open [r (io/reader (io/input-stream file))]
-                  (doall (csv/read-csv r :separator \tab :quote 0)))]
-    (vec
-     (if header?
-       (drop 1 records)
-       records))))
+(defn codepoint-range->string [codepoints]
+  (string/join (for [codepoint codepoints] (char codepoint))))
 
-(defn write-tsv [file-name header map-seq]
-  (with-open [out-file (io/writer file-name)]
-    (clojure.data.csv/write-csv out-file [header] :separator \tab) ; header
-    (doseq [kv map-seq]
-      (clojure.data.csv/write-csv out-file [kv] :separator \tab))))
+(def delimiter-set (set (vec (str delimiter))))
+(def alphanumerics-set (set (vec (str "0123456789"
+                                      (codepoint-range->string (range 65 123))
+                                      (codepoint-range->string (range 65313 65371))
+                                      (codepoint-range->string (range 65296 65306))))))
+(def closing-quotation-set (set (vec (str closing-quotation))))
 
-(defn write-tsv-map [file-name map-seq]
-  (with-open [out-file (io/writer file-name)]
-    (let [ks (keys (second (first map-seq)))]
-      (clojure.data.csv/write-csv out-file [(conj ks "word")] :separator \tab) ; header
-      (doseq [[k map-vals] map-seq]
-        (clojure.data.csv/write-csv out-file [(concat [k] (mapv map-vals ks))] :separator \tab)))))
+(defn split-japanese-sentence
+  "Splits given string on Japanese sentence boundaries. Returns a
+  vector of sentences.
 
-(defn write-tsv-sparse [file-name header sparse-header map-seq]
-  (with-open [out-file (io/writer file-name)]
-    (clojure.data.csv/write-csv out-file [(apply conj header sparse-header)] :separator \tab) ; header
-    (doseq [[k vs] map-seq]
-      (clojure.data.csv/write-csv out-file [(apply conj k (for [sh sparse-header] (get vs sh 0.0)))] :separator \tab))))
+  TODO: - fail if it is '~5.~' or '~.5~'
+        - fail if it is part of a word (Yahoo!)
+        - fail if not all quotations have been closed"
+  [s]
+  (->> s
+       reverse
+       vec
+       (r/reduce (fn
+                   ([] [])
+                   ([a x]
+                      (let [y (peek a)
+                            z (and y (peek (pop a)))]
+                        (if (and y z
+                                 (delimiter-set y)                   ; ...|x |y |z |...
+                                 (not (or (and (alphanumerics-set x) ;|   |５|．|０|
+                                               (not= \。 y)          ;|mpl|e |. |c |om/
+                                               (alphanumerics-set z));|   |  |  |  |
+                                          (closing-quotation-set z)  ; ...|る|。|）|と言った
+                                          (delimiter-set z))))       ; ...|。|。|。|
+                          (conj (pop (pop a)) z \newline y x)
+                          (conj a x))))))
+       reverse
+       string/join
+       string/split-lines))
 
+;; TODO FIXME make a stand-off interface to the text that keeps the
+;; original but always returns, on demand (memoized?), paragraphs,
+;; sentences, etc. The interface is required to provide character
+;; offsets for everything and convert between them.
+;; This might also pave the way to quotation detection support, or
+;; even integration with kytea+eda/juman+knp.
+
+(defn lines->paragraph-sentences
+  "Splits string into paragraphs and sentences.
+   Paragraphs are defined as:
+   1) one or more non-empty lines delimited by one empty line or BOF/EOF
+   2) lines prefixed with fullwidth unicode space '　'"
+  [lines]
+  (into []
+        (comp
+         ; Partition by paragraph (empty line or indented line (common in BCCWJ)).
+         (partition-by #(or (nil? %) (empty? %) (= (subs % 0 1) "　")))
+         (map (fn [paragraphs]
+                (->> paragraphs
+                     (sequence
+                      (comp (filter identity)
+                            (remove empty?)
+                            (map split-japanese-sentence)))
+                     flatten)))
+         (remove (partial every? empty?))) ; Remove paragraph boundaries.
+        lines))
+
+(defn add-tags [paragraphs]
+  (into [] (map #(hash-map :tags #{} :sentences %) paragraphs)))
+
+(comment
+  (bench (lines->paragraph-sentences ["フェイスブック（ＦＢ）やツイッターなどソーシャルメディアを使った採用活動が、多くの企業に広がっている。ＦＢでの会社説明会やＯＢ・ＯＧ訪問受け付け、ソーシャルスキルをはかって面接代わりにする動きも出てきた。" "企業側のソーシャル活用法も多様になっている。" nil "「実際、どれくらいの休みが取れるのでしょうか」「女性にとって働きやすい職場ですか」。"])))
 
 (s/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
   [doc :- DocumentSchema
    token-fn :- clojure.lang.IFn]
+  ;; transducers
   (->> doc
        :paragraphs
        (r/mapcat :sentences)
        (r/map parse/parse-sentence)
-       (r/reduce (fn ;; mecab is not thread-safe so we cannot use fold; consider core.async wrapper (using executor-based wrapper for now) (foldcat??)
+       (r/reduce (fn
                    ([] []) ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
                    ([a b] (into a (r/map token-fn b)))))))
