@@ -17,4 +17,4 @@
   :min-lein-version "2.0.0"
   :resource-paths ["data"]
   :jvm-opts ["-server"]
-  :main corpus-utils.text)
+  :main ^:skip-aot corpus-utils.text)
