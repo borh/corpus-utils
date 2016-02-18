@@ -83,7 +83,7 @@
                                    #{})
                            :sentences sentences})
                         paragraphs)
-                  [0 :tags] conj :title)}))
+                  [0 :tags] conj :title)})) ; NOTE: the first sentence is always a title.
 
 (s/defn document-seq :- [DocumentSchema]
   "Given a suitable (quasi)XML file generated from a Wikipedia dump, returns a lazy sequence of maps containing sources meta-information and parsed paragraphs."
