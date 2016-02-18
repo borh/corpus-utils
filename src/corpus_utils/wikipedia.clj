@@ -58,7 +58,6 @@
         {:keys [hiragana katakana kanji]
          :or {hiragana 0 katakana 0 kanji 0}}
         (->> text (map str) (map char-writing-system) frequencies)]
-    (println length)
     (if (and
          (> length 50)
          (> (/
