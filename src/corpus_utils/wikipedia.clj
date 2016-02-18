@@ -29,7 +29,7 @@
    :year      year
    :basename  (str "jw" id)
    :corpus    "Wikipedia"
-   :category  ["Wikipedia"]})
+   :category  ["Wikipedia" "百科事典"]})
 
 (s/defn process-doc :- DocumentSchema
   [metadata
