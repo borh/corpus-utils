@@ -74,20 +74,22 @@
    Paragraphs are defined as:
    1) one or more non-empty lines delimited by one empty line or BOF/EOF
    2) lines prefixed with fullwidth unicode space '　'"
-  [lines]
-  (into []
-        (comp
-         ; Partition by paragraph (empty line or indented line (common in BCCWJ)).
-         (partition-by #(or (nil? %) (empty? %) (= (subs % 0 1) "　")))
-         (map (fn [paragraphs]
-                (->> paragraphs
-                     (sequence
-                      (comp (filter identity)
-                            (remove empty?)
-                            (map split-japanese-sentence)))
-                     flatten)))
-         (remove (partial every? empty?))) ; Remove paragraph boundaries.
-        lines))
+  ([lines]
+   (lines->paragraph-sentences lines #(or (nil? %) (empty? %) (= (subs % 0 1) "　"))))
+  ([lines split-fn]
+   (into []
+         (comp
+          ;; Partition by paragraph (empty line or indented line (common in BCCWJ)).
+          (partition-by split-fn)
+          (map (fn [paragraphs]
+                 (->> paragraphs
+                      (sequence
+                       (comp (filter identity)
+                             (remove empty?)
+                             (map split-japanese-sentence)))
+                      flatten)))
+          (remove (partial every? empty?))) ; Remove paragraph boundaries.
+         lines)))
 
 (defn add-tags [paragraphs]
   (into [] (map #(hash-map :tags #{} :sentences %) paragraphs)))
