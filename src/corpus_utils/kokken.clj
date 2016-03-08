@@ -94,8 +94,8 @@
          (map (partial parse-document corpus year number filename)))))
 
 (s/defn document-seq :- [DocumentSchema]
-  [data-dir :- s/Str]
-  (->> (fs/glob (str data-dir "/*.xml"))
+  [options :- {:corpus-dir s/Str}]
+  (->> (fs/glob (str (:corpus-dir options) "/*.xml"))
        (mapcat parse-document-seq)))
 
 (comment

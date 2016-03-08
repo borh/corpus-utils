@@ -316,12 +316,12 @@
        vec))
 
 (s/defn document-seq ;; :- [DocumentSchema] ;; TODO validate lazy-seq?
-  [metadata-dir :- s/Str
-   data-dir     :- s/Str]
+  [options :- {:corpus-dir s/Str
+               :metadata-dir s/Str}]
   (lazy-seq
-   (->> (parse-metadata metadata-dir)
+   (->> (parse-metadata (:metadata-dir options))
         (map (fn [metadata]
-               (let [filename (str data-dir (:subcorpus metadata) "/" (:basename metadata) ".xml")]
+               (let [filename (str (:corpus-dir options) (:subcorpus metadata) "/" (:basename metadata) ".xml")]
                  {:metadata metadata
                   :paragraphs (parse-document filename)}))))))
 
