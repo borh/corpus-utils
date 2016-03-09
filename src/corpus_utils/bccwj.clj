@@ -10,7 +10,7 @@
             [schema.core :as s]
             [corpus-utils.c-code :refer [c-code]]
             [corpus-utils.utils :as utils]
-            [corpus-utils.document :refer [MetadataSchema SentencesSchema]])
+            [corpus-utils.document :refer [MetadataSchema DocumentSchema SentencesSchema]])
   (:import [fast_zip.core ZipperLocation]
            [java.util.zip ZipFile ZipEntry]))
 
@@ -315,9 +315,10 @@
        (remove #(empty? (:sentences %))) ; Remove paragraphs with no sentences.
        vec))
 
-(s/defn document-seq ;; :- [DocumentSchema] ;; TODO validate lazy-seq?
+(s/defn document-seq :- [DocumentSchema] ;; TODO validate lazy-seq?
   [options :- {:corpus-dir s/Str
-               :metadata-dir s/Str}]
+               :metadata-dir s/Str
+               s/Keyword s/Any}]
   (lazy-seq
    (->> (parse-metadata (:metadata-dir options))
         (map (fn [metadata]

@@ -87,7 +87,7 @@
 
 (s/defn document-seq :- [DocumentSchema]
   "Given a suitable (quasi)XML file generated from a Wikipedia dump, returns a lazy sequence of maps containing sources meta-information and parsed paragraphs."
-  [options :- {:corpus-file s/Str}]
+  [options :- {:corpus-file s/Str s/Keyword s/Any}]
   (let [metadata (->> (utils/read-tsv (str (:corpus-file options) ".metadata.tsv") true)
                       first
                       (map #(try (Integer/parseInt %) (catch Exception e)))
