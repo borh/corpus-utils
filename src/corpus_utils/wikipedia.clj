@@ -51,7 +51,7 @@
      :else :symbols)))
 
 (s/defn is-japanese? :- s/Bool
-  [doc :- [[s/Str] s/Str]]
+  [doc :- [(s/one [s/Str] "header") s/Str]]
   (let [[_ lines] doc
         text (str/join lines)
         length (count text)
@@ -68,7 +68,7 @@
 
 (s/defn process-doc :- DocumentSchema
   [metadata :- {:year s/Num :month s/Num :day s/Num}
-   doc :- [[s/Str] s/Str]]
+   doc :- [(s/one [s/Str] "header") s/Str]]
   (let [[[header] lines] doc
         paragraphs (-> lines
                        drop-last ; Drop closing </doc> and split into paragraphs and lines.
