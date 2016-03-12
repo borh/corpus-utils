@@ -1,4 +1,4 @@
-(defproject corpus-utils "0.2.6"
+(defproject corpus-utils "0.2.7"
   :description "Miscellaneous utilities to parse Japanese language corpora with Clojure"
   :url "https://github.com/borh/corpus-utils.git"
   :license {:name "Eclipse Public License"
@@ -12,6 +12,7 @@
                  [me.raynes/fs "1.4.6"]
                  [org.apache.commons/commons-compress "1.10"]
                  [org.tukaani/xz "1.5"]
+                 [com.ibm.icu/icu4j "56.1"]
                  [prismatic/schema "1.0.5"]
                  [prismatic/plumbing "0.5.2"]]
   :min-lein-version "2.0.0"

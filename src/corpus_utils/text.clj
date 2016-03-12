@@ -3,7 +3,20 @@
             [clj-mecab.parse :as parse]
             [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
             [clojure.core.reducers :as r]
-            [clojure.string :as string]))
+            [clojure.string :as string])
+  (:import [com.ibm.icu.text Transliterator Normalizer]))
+
+;; # Text normalization
+
+(defonce half-to-fullwidth (Transliterator/getInstance "Halfwidth-Fullwidth"))
+
+(defn convert-half-to-fullwidth
+  [^String s]
+    (.transliterate ^Transliterator half-to-fullwidth s))
+
+(defn normalize-nfkc
+  [^String s]
+  (Normalizer/normalize s Normalizer/NFKC))
 
 ;; # Sentence and paragraph splitting
 (def delimiter   #"[\.!\?．。！？]")
