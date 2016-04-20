@@ -12,7 +12,7 @@
 
 (defn convert-half-to-fullwidth
   [^String s]
-    (.transliterate ^Transliterator half-to-fullwidth s))
+  (.transliterate ^Transliterator half-to-fullwidth s))
 
 (defn normalize-nfkc
   [^String s]
