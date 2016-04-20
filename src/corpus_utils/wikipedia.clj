@@ -70,11 +70,12 @@
   [metadata :- {:year s/Num :month s/Num :day s/Num}
    doc :- [(s/one [s/Str] "header") s/Str]]
   (let [[[header] lines] doc
-        paragraphs (-> lines
-                       drop-last ; Drop closing </doc> and split into paragraphs and lines.
-                       (map text/normalize-nfkc)
-                       (map text/convert-half-to-fullwidth)
-                       (text/lines->paragraph-sentences identity))]
+        paragraphs (text/lines->paragraph-sentences
+                    (->> lines
+                         drop-last ; Drop closing </doc> and split into paragraphs and lines.
+                         (map text/normalize-nfkc)
+                         (map text/convert-half-to-fullwidth))
+                    identity)]
     {:metadata (let [[id title] (extract-header header)]
                  (make-sources-record title (:year metadata) id))
      :paragraphs (update-in
