@@ -40,7 +40,8 @@
   (let [code-point (.codePointAt ch 0)]
     (cond
      (and (>= code-point 0x3041) (<= code-point 0x309f)) :hiragana
-     (and (>= code-point 0x4e00) (<= code-point 0x9fff)) :kanji
+     (or (and (>= code-point 0x4e00) (<= code-point 0x9fff))
+         (= code-point 0x3005)) :kanji ;; 0x3005 -> kanji repeat mark
      (and (>= code-point 0x30a0) (<= code-point 0x30ff)) :katakana
      (or (and (>= code-point 65)    (<= code-point 122))    ; half-width alphabet (A-Za-z)
          (and (>= code-point 65313) (<= code-point 65370))  ; full-width alphabet (Ａ-Ｚａ-ｚ)
