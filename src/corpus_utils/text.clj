@@ -107,9 +107,6 @@
 (defn add-tags [paragraphs]
   (into [] (map #(hash-map :tags #{} :sentences %) paragraphs)))
 
-(comment
-  (bench (lines->paragraph-sentences ["フェイスブック（ＦＢ）やツイッターなどソーシャルメディアを使った採用活動が、多くの企業に広がっている。ＦＢでの会社説明会やＯＢ・ＯＧ訪問受け付け、ソーシャルスキルをはかって面接代わりにする動きも出てきた。" "企業側のソーシャル活用法も多様になっている。" nil "「実際、どれくらいの休みが取れるのでしょうか」「女性にとって働きやすい職場ですか」。"])))
-
 (s/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
   [doc :- DocumentSchema
    token-fn :- clojure.lang.IFn]
