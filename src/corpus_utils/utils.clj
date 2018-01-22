@@ -57,7 +57,7 @@
 
 (defn write-tsv-map [file-name map-seq]
   (with-open [out-file (io/writer file-name)]
-    (let [ks (keys (second (first map-seq)))]
+    (let [ks (keys (first map-seq))]
       (clojure.data.csv/write-csv out-file [(conj ks "word")] :separator \tab) ; header
       (doseq [[k map-vals] map-seq]
         (clojure.data.csv/write-csv out-file [(concat [k] (mapv map-vals ks))] :separator \tab)))))
