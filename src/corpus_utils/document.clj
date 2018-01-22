@@ -37,6 +37,7 @@
           :year      s/Int
           :basename  s/Str
           :corpus    s/Str
+          (opt :script) s/Str
           (opt :subcorpus) s/Str
           :category  [s/Str]}))
 
