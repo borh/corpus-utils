@@ -57,7 +57,13 @@
    number :- s/Str
    filename :- java.io.File
    article-loc :- ZipperLocation]
-  (let [[title author title-alt style genre] ((juxt :題名 :著者 :欄名 :文体 :ジャンル) (:attrs (fz/node article-loc)))]
+  (let [attrs (:attrs (fz/node article-loc))
+        title (or (:題名 attrs) (:title attrs) "")
+        author (or (:著者 attrs) (:author attrs) "")
+        title-alt (:欄名 attrs)
+        style (or (:文体 attrs) (:style attrs))
+        script (or (:script attrs) "漢字かな") ;; TODO This can be a corpus-level attribute too. Meiroku is at this level, though. Is this a good default? Should keywordize this!
+        genre (or (:ジャンル attrs) "")]
     {:paragraphs
      (->> article-loc
           fz/down
@@ -66,15 +72,18 @@
           ;;(take 2)
           (mapcat partition-by-paragraph)
           (map (fn [text] {:tags #{}
-                          :sentences text}))
+                           :sentences text}))
           (into []))
      :metadata
      {:title     title
       :author    author
       :publisher corpus
-      :year      (Integer/parseInt year)
+      :year      (try (Integer/parseInt year)
+                      (catch Exception e
+                        (println "Caught exception: " e)))
       :basename  (fs/base-name filename ".xml")
       :corpus    corpus
+      :script    script
       :category  [(get ndc-map (str/replace genre #"^NDC" "") "分類なし")]}}))
 
 (s/defn parse-document-seq :- [DocumentSchema]
@@ -84,7 +93,10 @@
                      io/input-stream
                      xml/parse
                      fz/xml-zip)
-        [corpus year number] ((juxt :雑誌名 :年 :号) (-> root-loc fz/node :attrs ))]
+        attrs (-> root-loc fz/node :attrs)
+        [corpus year number] [(get attrs :雑誌名 (:title attrs))
+                              (get attrs :年 (:year attrs))
+                              (get attrs :号 (:issue attrs))]]
     (->> root-loc
          fz/down ;; Descend to the :記事 level.
          fz/rights
@@ -97,6 +109,3 @@
   [options :- {:corpus-dir s/Str s/Keyword s/Any}]
   (->> (fs/glob (str (:corpus-dir options) "/*.xml"))
        (mapcat parse-document-seq)))
-
-(comment
-  (s/with-fn-validation (parse-document-seq "/data/taiyo-corpus/XML/t189506.xml")))
