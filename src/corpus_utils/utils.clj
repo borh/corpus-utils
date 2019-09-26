@@ -1,13 +1,12 @@
 (ns corpus-utils.utils
-  (:require [schema.core :as s]
+  (:require [clojure.spec.alpha :as s]
             [clojure.java.io :as io]
             [clojure.data.csv :as csv])
   (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]
            [java.net URL]))
 
-(s/defn read-tsv-xz :- [[s/Str]]
-  [file :- URL
-   header? :- Boolean]
+(defn read-tsv-xz
+  [file header?]
   (let [records
         (with-open [r (-> file
                           io/input-stream
@@ -15,39 +14,52 @@
                           io/reader)]
           (doall (csv/read-csv r :separator \tab :quote 0)))]
     (vec
-     (if header?
-       (drop 1 records)
-       records))))
+      (if header?
+        (drop 1 records)
+        records))))
 
-(s/defn read-tsv :- [[s/Str]]
-  [file :- s/Str
-   header? :- Boolean]
+(s/fdef read-tsv-xz
+  :args (s/cat :file #(instance? URL %) :header? boolean?)
+  :ret (s/coll-of (s/coll-of string?)))
+
+(defn read-tsv
+  [file header?]
   (let [records (with-open [r (io/reader file)]
                   (doall (csv/read-csv r :separator \tab :quote 0)))]
     (vec
-     (if header?
-       (drop 1 records)
-       records))))
+      (if header?
+        (drop 1 records)
+        records))))
 
-(s/defn read-csv :- [[s/Str]]
-  [file :- s/Str
-   header? :- Boolean]
+(s/fdef read-tsv
+  :args (s/cat :file string? :header? boolean?)
+  :ret (s/coll-of (s/coll-of string?)))
+
+(defn read-csv
+  [file header?]
   (let [records (with-open [r (io/reader file)]
                   (doall (csv/read-csv r :separator \, :quote \")))]
     (vec
-     (if header?
-       (drop 1 records)
-       records))))
+      (if header?
+        (drop 1 records)
+        records))))
 
-(s/defn read-tsv-URL :- [[s/Str]]
-  [file :- URL
-   header? :- Boolean]
+(s/fdef read-csv
+  :args (s/cat :file string? :header? boolean?)
+  :ret (s/coll-of (s/coll-of string?)))
+
+(defn read-tsv-URL
+  [file header?]
   (let [records (with-open [r (io/reader (io/input-stream file))]
                   (doall (csv/read-csv r :separator \tab :quote 0)))]
     (vec
-     (if header?
-       (drop 1 records)
-       records))))
+      (if header?
+        (drop 1 records)
+        records))))
+
+(s/fdef read-tsv-URL
+  :args (s/cat :file #(instance? URL %) :header? boolean?)
+  :ret (s/coll-of (s/coll-of string?)))
 
 (defn write-tsv [file-name header map-seq]
   (with-open [out-file (io/writer file-name)]

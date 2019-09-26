@@ -1,7 +1,7 @@
 (ns corpus-utils.text
-  (:require [schema.core :as s]
+  (:require [clojure.spec.alpha :as s]
             [clj-mecab.parse :as parse]
-            [corpus-utils.document :refer [UnidicMorphemeSchema DocumentSchema]]
+            [corpus-utils.document]
             [clojure.core.reducers :as r]
             [clojure.string :as string])
   (:import [com.ibm.icu.text Transliterator Normalizer]))
@@ -19,11 +19,11 @@
   (Normalizer/normalize s Normalizer/NFKC))
 
 ;; # Sentence and paragraph splitting
-(def delimiter   #"[\.!\?．。！？]")
+(def delimiter #"[\.!\?．。！？]")
 ;; Take care not to use this with JStage data -- temporary hack for BCCWJ
 (comment (def delimiter-2 #"[!\?。！？]"))
-(def closing-quotation #"[\)）」』】］〕〉》\]]") ; TODO
-(def opening-quotation #"[\(（「『［【〔〈《\[]") ; TODO
+(def closing-quotation #"[\)）」』】］〕〉》\]]")                   ; TODO
+(def opening-quotation #"[\(（「『［【〔〈《\[]")                   ; TODO
 (def numbers #"[０-９\d]")
 ;;(def alphanumerics #"[0-9\uFF10-\uFF19a-zA-Z\uFF41-\uFF5A\uFF21-\uFF3A]")
 (def alphanumerics #"[\d０-９a-zA-Zａ-ｚＡ-Ｚ]")
@@ -31,10 +31,10 @@
 (comment
   (def sentence-split-re
     (re-pattern
-     (format "(?<=%s+)(?!%s+|%s+)"
-             delimiter-2
-             closing-quotation
-             alphanumerics))))
+      (format "(?<=%s+)(?!%s+|%s+)"
+              delimiter-2
+              closing-quotation
+              alphanumerics))))
 
 (defn codepoint-range->string [codepoints]
   (string/join (for [codepoint codepoints] (char codepoint))))
@@ -57,20 +57,21 @@
   (->> s
        reverse
        vec
-       (r/reduce (fn
-                   ([] [])
-                   ([a x]
-                      (let [y (peek a)
-                            z (and y (peek (pop a)))]
-                        (if (and y z
-                                 (delimiter-set y)                   ; ...|x |y |z |...
-                                 (not (or (and (alphanumerics-set x) ;|   |５|．|０|
-                                               (not= \。 y)          ;|mpl|e |. |c |om/
-                                               (alphanumerics-set z));|   |  |  |  |
-                                          (closing-quotation-set z)  ; ...|る|。|）|と言った
-                                          (delimiter-set z))))       ; ...|。|。|。|
-                          (conj (pop (pop a)) z \newline y x)
-                          (conj a x))))))
+       (r/reduce
+         (fn
+           ([] [])
+           ([a x]
+            (let [y (peek a)
+                  z (and y (peek (pop a)))]
+              (if (and y z
+                       (delimiter-set y)                    ; ...|x |y |z |...
+                       (not (or (and (alphanumerics-set x)  ;|   |５|．|０|
+                                     (not= \。 y)            ;|mpl|e |. |c |om/
+                                     (alphanumerics-set z)) ;|   |  |  |  |
+                                (closing-quotation-set z)   ; ...|る|。|）|と言った
+                                (delimiter-set z))))        ; ...|。|。|。|
+                (conj (pop (pop a)) z \newline y x)
+                (conj a x))))))
        reverse
        string/join
        string/split-lines))
@@ -84,37 +85,40 @@
 
 (defn lines->paragraph-sentences
   "Splits string into paragraphs and sentences.
-   Paragraphs are defined as:
+   Paragraphs are detected using the passed in `paragraph-split-fn` and are by default defined as:
    1) one or more non-empty lines delimited by one empty line or BOF/EOF
    2) lines prefixed with fullwidth unicode space '　'"
   ([lines]
    (lines->paragraph-sentences lines #(or (nil? %) (empty? %) (= (subs % 0 1) "　"))))
-  ([lines split-fn]
+  ([lines paragraph-split-fn]
    (into []
          (comp
-          ;; Partition by paragraph (empty line or indented line (common in BCCWJ)).
-          (partition-by split-fn)
-          (map (fn [paragraphs]
-                 (->> paragraphs
-                      (sequence
-                       (comp (filter identity)
-                             (remove empty?)
-                             (map split-japanese-sentence)))
-                      flatten)))
-          (remove (partial every? empty?))) ; Remove paragraph boundaries.
+           ;; Partition by paragraph (empty line or indented line (common in BCCWJ)).
+           (partition-by paragraph-split-fn)
+           (map (fn [paragraphs]
+                  (->> paragraphs
+                       (sequence
+                         (comp (filter identity)
+                               (remove empty?)
+                               (map split-japanese-sentence)))
+                       flatten
+                       (into []))))
+           (remove (partial every? empty?)))                ; Remove paragraph boundaries.
          lines)))
 
 (defn add-tags [paragraphs]
-  (into [] (map #(hash-map :tags #{} :sentences %) paragraphs)))
+  (into [] (map #(hash-map :paragraph/tags #{} :paragraph/sentences %) paragraphs)))
 
-(s/defn parse-document :- [s/Str] ;; [UnidicMorphemeSchema]
-  [doc :- DocumentSchema
-   token-fn :- clojure.lang.IFn]
-  ;; transducers
+(defn parse-document
+  [doc token-fn]
   (->> doc
-       :paragraphs
-       (r/mapcat :sentences)
+       :document/paragraphs
+       (r/mapcat :paragraph/sentences)
        (r/map parse/parse-sentence)
        (r/reduce (fn
-                   ([] []) ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
+                   ([] [])                                  ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
                    ([a b] (into a (r/map token-fn b)))))))
+
+(s/fdef parse-document
+  :args (s/cat :doc :corpus/document :token-fn ifn?)
+  :ret (s/coll-of string?))

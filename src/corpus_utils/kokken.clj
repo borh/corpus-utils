@@ -4,10 +4,11 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
-            [schema.core :as s]
+            [clojure.spec.alpha :as s]
             [corpus-utils.utils :as utils]
-            [corpus-utils.document :refer [DocumentSchema]])
-  (:import [fast_zip.core ZipperLocation]))
+            [corpus-utils.document])
+  (:import [fast_zip.core ZipperLocation]
+           (java.io File)))
 
 ;; :sentence -> :s
 ;; + metadata is in file
@@ -21,8 +22,8 @@
 ;;      {:tags #{ ... },
 ;;       :sentences [ ... ]}]
 
-(s/defn filter-sentences :- s/Str
-  [sentences-loc :- [ZipperLocation]]
+(defn filter-sentences
+  [^ZipperLocation sentences-loc]
   (->> sentences-loc
        (map fz/node)
        (filter string?)
@@ -30,11 +31,15 @@
        (map (comp (fn [s] (str/replace s " " "")) first))
        str/join))
 
+(s/fdef filter-sentences
+  :args (s/cat :sentences-loc #(instance? ZipperLocation %))
+  :ret string?)
+
 ;; TODO: Turn <引用 種別="記事説明" 話者="記者"> into tags!
 ;; Refactor to BCCWJ format. (+ look for more elegant ways to get at this hierarchical data)
-(s/defn partition-by-paragraph :- [[s/Str]]
-  [m :- ZipperLocation]
-  (->> m ;; Reset zipper root node to current loc.
+(defn partition-by-paragraph
+  [^ZipperLocation m]
+  (->> m                                                    ;; Reset zipper root node to current loc.
        fz/node
        fz/xml-zip
        (iterate fz/next)
@@ -46,23 +51,23 @@
                   (remove empty?)
                   (into [])))
        (remove empty?)
-       (into [])
-       #_((fn [a] (doto a println)))))
+       (into [])))
 
+(s/fdef partition-by-paragraph
+  :args (s/cat :m #(instance? ZipperLocation %))
+  :ret (s/coll-of (s/coll-of string?)))
+
+;; FIXME Refactor this into its own thing, perhaps under a delay?
 (defonce ndc-map (into {} (utils/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
 
-(s/defn parse-document :- DocumentSchema
-  [corpus :- s/Str
-   year :- s/Str
-   number :- s/Str
-   filename :- java.io.File
-   article-loc :- ZipperLocation]
+(defn parse-document
+  [corpus year number filename article-loc]
   (let [attrs (:attrs (fz/node article-loc))
         title (or (:題名 attrs) (:title attrs) "")
         author (or (:著者 attrs) (:author attrs) "")
         title-alt (:欄名 attrs)
         style (or (:文体 attrs) (:style attrs))
-        script (or (:script attrs) "漢字かな") ;; TODO This can be a corpus-level attribute too. Meiroku is at this level, though. Is this a good default? Should keywordize this!
+        script (or (:script attrs) "漢字かな")                  ;; TODO This can be a corpus-level attribute too. Meiroku is at this level, though. Is this a good default? Should keywordize this!
         genre (or (:ジャンル attrs) "")]
     {:paragraphs
      (->> article-loc
@@ -71,7 +76,7 @@
           (take-while (complement nil?))
           ;;(take 2)
           (mapcat partition-by-paragraph)
-          (map (fn [text] {:tags #{}
+          (map (fn [text] {:tags      #{}
                            :sentences text}))
           (into []))
      :metadata
@@ -86,9 +91,13 @@
       :script    script
       :category  [(get ndc-map (str/replace genre #"^NDC" "") "分類なし")]}}))
 
-(s/defn parse-document-seq :- [DocumentSchema]
+(s/fdef parse-document
+  :args (s/cat :corpus string? :year string? :number string? :filename #(instance? File %) :article-loc #(instance? ZipperLocation %))
+  :ret :corpus/document)
+
+(defn parse-document-seq
   "Each XML file from The Sun corpus contains several articles, so we return a vector of documents."
-  [filename :- java.io.File]
+  [filename]
   (let [root-loc (-> filename
                      io/input-stream
                      xml/parse
@@ -98,14 +107,22 @@
                               (get attrs :年 (:year attrs))
                               (get attrs :号 (:issue attrs))]]
     (->> root-loc
-         fz/down ;; Descend to the :記事 level.
+         fz/down                                            ;; Descend to the :記事 level.
          fz/rights
          ;; Documents can be empty...
          (remove nil?)
          (map fz/xml-zip)
          (map (partial parse-document corpus year number filename)))))
 
-(s/defn document-seq :- [DocumentSchema]
-  [options :- {:corpus-dir s/Str s/Keyword s/Any}]
+(s/fdef parse-document-seq
+  :args (s/cat :filename #(instance? File %))
+  :ret :corpus/documents)
+
+(defn document-seq
+  [options]
   (->> (fs/glob (str (:corpus-dir options) "/*.xml"))
        (mapcat parse-document-seq)))
+
+(s/fdef document-seq
+  :args (s/cat :options (s/keys :req-un [:corpus/dir string? :metadata/dir string?]))
+  :ret :corpus/documents)
