@@ -62,7 +62,6 @@
          :or   {hiragana 0 katakana 0 kanji 0}}
         (into {} (x/by-key identity x/count)
               (sequence (comp (map str) (map char-writing-system)) text))]
-    (println hiragana katakana kanji text)
     (if (and
           (> length 50)
           (> (/
