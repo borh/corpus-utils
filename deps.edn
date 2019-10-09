@@ -5,16 +5,17 @@
            me.raynes/fs                        {:mvn/version "1.4.6"}
            org.apache.commons/commons-compress {:mvn/version "1.19"}
            org.tukaani/xz                      {:mvn/version "1.8"}
-           com.ibm.icu/icu4j                   {:mvn/version "64.2"}
-           ;; prismatic/schema                    {:mvn/version "1.1.12"}
-           prismatic/plumbing                  {:mvn/version "0.5.5"}
-           arachne-framework/aristotle         {:git/url    "https://github.com/arachne-framework/aristotle"
-                                                :sha        "7b93e62abc45c82c75d5cf6c0ae2c0e21a233e81"
-                                                :exclusions [org.apache.jena/apache-jena-libs]}
-           org.apache.jena/apache-jena-libs    {:mvn/version "3.12.0" :extension "pom"}
+           com.ibm.icu/icu4j                   {:mvn/version "65.1"}
+           net.cgrand/xforms                   {:mvn/version "0.19.2"}
+           arachne-framework/aristotle         {:git/url "https://github.com/arachne-framework/aristotle"
+                                                :sha     "7b93e62abc45c82c75d5cf6c0ae2c0e21a233e81"
+                                                #_:exclusions #_[org.apache.jena/apache-jena-libs]}
+           ;; org.apache.jena/apache-jena-libs    {:mvn/version "3.12.0" :extension "pom"}
            com.sun.xml.bind/jaxb-impl          {:mvn/version "2.3.2"}
            com.sun.xml.bind/jaxb-core          {:mvn/version "2.3.0.1"}
            org.glassfish.jaxb/jaxb-runtime     {:mvn/version "2.4.0-b180830.0438"}}
  :paths   ["src" "data"]
  :aliases {:test {:extra-paths ["test"]
-                  :extra-deps  {org.clojure/test.check {:mvn/version "0.10.0"}}}}}
+                  :extra-deps  {expound                {:mvn/version "0.7.2"}
+                                orchestra              {:mvn/version "2019.02.17-SNAPSHOT"}
+                                org.clojure/test.check {:mvn/version "0.10.0"}}}}}
