@@ -6,35 +6,19 @@
     [clojure.string :as string]
     [clojure.core.reducers :as r]
     ;;[org.httpkit.client :as http]
-    [plumbing.core :refer [for-map map-vals]]
+    [net.cgrand.xforms :as x]
     [clojure.spec.alpha :as s]
     [corpus-utils.ndc :as ndc]
     [corpus-utils.c-code :refer [c-code]]
     [corpus-utils.utils :as utils]
-    [corpus-utils.document]
-    [me.raynes.fs :as fs])
+    [corpus-utils.document])
   (:import [fast_zip.core ZipperLocation]
-           [java.io File InputStream]
-           [org.apache.commons.compress.archivers.zip ZipFile ZipArchiveEntry]))
+           [java.io InputStream]))
 
 ;; # Importer for BCCWJ-Formatted C-XML Data
 ;;
 ;; Imports C-XML-type data.
 ;; M-XML is also supported, but is not recommended as we do our own parsing.
-
-;; ## Utility functions
-(defn walk-zip-file
-  [apply-fn path]
-  (with-open [z (ZipFile. (fs/file path))]
-    (let [files (enumeration-seq (.getEntries z))]
-      (doall (for [file files
-                   :let [filename (.getName ^ZipArchiveEntry file)]
-                   :when (and (not (.isDirectory file)) (= ".xml" (string/lower-case (fs/extension filename))))]
-               (apply-fn (fs/base-name filename true) (.getInputStream z file)))))))
-
-(s/fdef walk-zip-file
-  :args (s/cat :zip-file #(instance? File %))
-  :ret (s/coll-of #(instance? InputStream %)))
 
 ;; ## XML Tags
 ;;
@@ -116,7 +100,7 @@
   [paragraph-level-tags xml-data]
   (loop [xml-loc (fz/xml-zip xml-data)
          tag-stack []
-         par-loc (fz/down (fz/vector-zip [{:tags [] :sentences []}]))]
+         par-loc (fz/down (fz/vector-zip [#:paragraph{:tags [] :sentences []}]))]
     (if (fz/end? xml-loc)
       (fz/root par-loc)
       (let [xml-node (fz/node xml-loc)
@@ -128,30 +112,32 @@
                                  xml-loc-right :same
                                  :else (:depth xml-loc-up))
             coded-tag (if (#{:speech :speaker :title :titleBlock :orphanedTitle :list :caption :citation :quotation :OCAnswer :OCQuestion} tag)
-                        (tag {:titleBlock :title :orphanedTitle :title} tag))
+                        (tag {:titleBlock :title :orphanedTitle :title} tag)
+                        tag)
             new-tag-stack (case next-direction
                             :down (conj tag-stack coded-tag)
                             :same (if (= :br tag) tag-stack (conj (pop tag-stack) coded-tag)) ; :br is an exception as a paragraph break, as it does not increase XML tree depth
                             ((apply comp (repeat next-direction pop)) tag-stack))] ; Discard equal to up depth.
+        #_(println next-direction tag coded-tag new-tag-stack)
         (recur
           (or xml-loc-down xml-loc-right (:loc xml-loc-up)) ; Same as (fz/next xml-loc).
           new-tag-stack
           (cond (paragraph-level-tags tag)                  ; Insert new paragraph, inserting the new tag stack.
-                (-> par-loc (fz/insert-right {:tags new-tag-stack :sentences [""]}) fz/right)
+                (-> par-loc (fz/insert-right {:paragraph/tags new-tag-stack :paragraph/sentences [""]}) fz/right)
 
                 (= :sentence tag)                           ; Insert new sentence.
                 (let [tag-stack (-> par-loc fz/node :tag-stack)]
                   ;; FIXME debug tag-stack
-                  (fz/edit par-loc update-in [:sentences] conj ""))
+                  (fz/edit par-loc update-in [:paragraph/sentences] conj ""))
 
                 (string? xml-node)                          ; Update last-inserted sentence's text.
-                (fz/edit par-loc update-in [:sentences (-> par-loc fz/node :sentences count dec)] #(str % xml-node))
+                (fz/edit par-loc update-in [:paragraph/sentences (-> par-loc fz/node :paragraph/sentences count dec)] #(str % xml-node))
 
                 :else par-loc))))))                         ; Do nothing.
 
 (s/fdef walk-and-emit
   :args (s/cat :paragraph-level-tags set? :xml-data any?)
-  :ret :corpus/document)
+  :ret :document/paragraphs)
 
 (defn parse-document
   [stream corpus]
@@ -164,7 +150,7 @@
     (into []
           (comp (map #(hash-map                             ; Remove nils/empty strings from :tags and :sentences.
                         :paragraph/tags (into #{} (filter identity) (:tags %))
-                        :paragraph/sentences (into [] (remove empty?) (:sentences %))))
+                        :paragraph/sentences (into [] (remove empty?) (:paragraph/sentences %))))
                 (remove #(empty? (:paragraph/sentences %)))) ; Remove paragraphs with no sentences.
           document)))
 
@@ -198,11 +184,10 @@
   (let [metadata (utils/read-tsv (str metadata-dir "Joined_info.txt") true)
         fixed-ndc (utils/read-tsv (str metadata-dir "BCCWJ-NDC.txt") true)
         copyright (into {} (utils/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
-        ndc-map (into {} (utils/read-tsv-URL (io/resource "ndc-3digits.tsv") false))
-        c-map (for-map [[k1 v1] (c-code "1")
-                        [k2 v2] (c-code "2")
-                        [k3 v3] (c-code "34")]
-                (str k1 k2 k3) #:metadata{:audience v1 :media v2 :topic v3})
+        c-map (into {} (x/for [[k1 v1] (c-code "1")
+                               [k2 v2] (c-code "2")
+                               [k3 v3] (c-code "34")]
+                              [(str k1 k2 k3) #:metadata{:audience v1 :media v2 :topic v3}]))
         name-map {"LB" "書籍"
                   "PB" "書籍"
                   "OB" "書籍"
@@ -239,7 +224,8 @@
               (let [metadata-patch? (if-let [v (get ndc-metadata basename)] v false)
                     [genre-1 genre-2 genre-3 genre-4] (if metadata-patch? metadata-patch? [genre-1 genre-2 genre-3 genre-4])]
                 (assoc m basename
-                         #:metadata{:title       (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
+                         #:metadata{:permission  true
+                                    :title       (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
                                     :author      author
                                     :gender      (let [authors (string/split author-gender #"/")]
                                                    (if (every? #(= (first authors) %) authors)
@@ -324,31 +310,31 @@
             (r/monoid
               (fn [a [basename & record]]
                 (assoc a basename
-                         (for-map [[k v] (zipmap header record)
-                                   :when (not= k :_)]
-                           k (cond (empty? v) nil
+                         (x/into {} (x/for [[k v] (zipmap header record)
+                                            :when (not= k :_)]
+                                           [k
+                                            (cond (empty? v) nil
 
-                                   ;; Coerce into Likert-scale Longs.
-                                   (and (#{:metadata/target-audience :metadata/hard-soft :metadata/informality
-                                           :metadata/addressing :metadata/other-addressing}
-                                         k)
-                                        (re-seq #"^\d+" v))
-                                   (Long/parseLong v)
+                                                  ;; Coerce into Likert-scale Longs.
+                                                  (and (#{:metadata/target-audience :metadata/hard-soft :metadata/informality
+                                                          :metadata/addressing :metadata/other-addressing}
+                                                        k)
+                                                       (re-seq #"^\d+" v))
+                                                  (Long/parseLong v)
 
-                                   ;; Coerce into binary values.
-                                   (#{:metadata/forward-or-afterward :metadata/dialog :metadata/quotation-type
-                                      :metadata/visual :metadata/db-or-list :metadata/archaic :metadata/foreign-language
-                                      :metadata/math-or-code :metadata/legalese :metadata/questionable-content
-                                      :metadata/low-content}
-                                    k)
-                                   (case (subs v 0 1) "1" true "0" false true)
+                                                  ;; Coerce into binary values.
+                                                  (#{:metadata/forward-or-afterward :metadata/dialog :metadata/quotation-type
+                                                     :metadata/visual :metadata/db-or-list :metadata/archaic :metadata/foreign-language
+                                                     :metadata/math-or-code :metadata/legalese :metadata/questionable-content
+                                                     :metadata/low-content}
+                                                   k)
+                                                  (case (subs v 0 1) "1" true "0" false true)
 
-                                   :else v))))
+                                                  :else v)]))))
               (fn [] {}))
             (next bccwj-meta-annotation-data)))]
-
-    (->> (merge-with merge bccwj-metadata bccwj-annotations)
-         (map-vals (fn [vs] (into {} (r/remove #(nil? (val %)) vs)))))))
+    (into {} (x/by-key (map (fn [vs] (into {} (r/remove #(nil? (val %)) vs)))))
+          (merge-with merge bccwj-metadata bccwj-annotations))))
 
 (s/fdef parse-metadata
   :args (s/cat :metadata-dir string?)
@@ -357,13 +343,14 @@
 (defn document-seq
   [options]
   (let [metadata (parse-metadata (:metadata-dir options))]
-    (walk-zip-file
+    (utils/walk-zip-file
       (fn [basename text]
-        (let [meta (get metadata basename)]
-          {:document/metadata   meta
-           :document/paragraphs (parse-document text (:subcorpus meta))}))
+        (if-let [meta (get metadata basename)]
+          #:document{:metadata   meta
+                     :paragraphs (parse-document text (:metadata/subcorpus meta))}
+          (throw (ex-info "Missing metadata for BCCWJ basename" {:basename basename}))))
       (:corpus-dir options))))
 
 (s/fdef document-seq
-  :args (s/cat :options (s/keys :req-un [:corpus/dir string? :metadata/dir string?]))
+  :args (s/cat :options (s/keys :req-un [::corpus-dir string? ::metadata-dir string?]))
   :ret :corpus/documents)

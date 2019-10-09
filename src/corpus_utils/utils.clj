@@ -1,9 +1,24 @@
 (ns corpus-utils.utils
   (:require [clojure.spec.alpha :as s]
             [clojure.java.io :as io]
-            [clojure.data.csv :as csv])
-  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream]
-           [java.net URL]))
+            [clojure.data.csv :as csv]
+            [me.raynes.fs :as fs]
+            [clojure.string :as string])
+  (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream XZCompressorOutputStream]
+           [java.net URL]
+           [org.apache.commons.compress.archivers.zip ZipFile ZipArchiveEntry]))
+
+(defn xz-reader [filename]
+  (-> filename
+      io/input-stream
+      XZCompressorInputStream.
+      io/reader))
+
+(defn xz-writer [filename]
+  (-> filename
+      io/output-stream
+      XZCompressorOutputStream.
+      io/writer))
 
 (defn read-tsv-xz
   [file header?]
@@ -79,3 +94,16 @@
     (clojure.data.csv/write-csv out-file [(apply conj header sparse-header)] :separator \tab) ; header
     (doseq [[k vs] map-seq]
       (clojure.data.csv/write-csv out-file [(apply conj k (for [sh sparse-header] (get vs sh 0.0)))] :separator \tab))))
+
+(defn walk-zip-file
+  [apply-fn path & {:keys [extension] :or {extension ".xml"}}]
+  (with-open [z (ZipFile. (fs/file path))]
+    (let [files (enumeration-seq (.getEntries z))]
+      (doall (for [file files
+                   :let [filename (.getName ^ZipArchiveEntry file)]
+                   :when (and (not (.isDirectory file)) (= extension (string/lower-case (fs/extension filename))))]
+               (apply-fn (fs/base-name filename true) (.getInputStream z file)))))))
+
+#_(s/fdef walk-zip-file
+  ;; :args (s/cat :apply-fn fn? :zip-file string?)
+  :ret (s/coll-of #(instance? InputStream %)))

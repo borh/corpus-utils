@@ -2,9 +2,12 @@
   (:require [arachne.aristotle :as aa]
             [arachne.aristotle.query :as q]
             [arachne.aristotle.registry :as reg]
-            [plumbing.core :refer [map-vals]]
+            [net.cgrand.xforms :as x]
             [clojure.java.io :as io]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [corpus-utils.utils :as utils]
+            [clojure.edn :as edn])
+  (:import [java.io PushbackReader]))
 
 (reg/prefix 'rdfs "http://www.w3.org/2000/01/rdf-schema#")
 (reg/prefix 'xsd "http://www.w3.org/2001/XMLSchema#")
@@ -28,4 +31,9 @@
                  [?concept :rdfs/label ?label]
                  [?concept :skos/notation ?notation]])))
 
-(defonce ndc-map (map-vals #(string/split % #"(?!（)(．|--)") (create-ndc-map)))
+(defn create-ndc-index! []
+  (let [index (into {} (x/by-key (map #(string/split % #"(?!（)(．|--)"))) (create-ndc-map))]
+    (with-open [w (utils/xz-writer "data/ndc9.edn.xz")]
+      (.write w (pr-str index)))))
+
+(defonce ndc-map (edn/read (PushbackReader. (utils/xz-reader (io/resource "ndc9.edn.xz")))))

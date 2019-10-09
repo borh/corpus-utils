@@ -95,14 +95,12 @@
          (comp
            ;; Partition by paragraph (empty line or indented line (common in BCCWJ)).
            (partition-by paragraph-split-fn)
-           (map (fn [paragraphs]
-                  (->> paragraphs
-                       (sequence
-                         (comp (filter identity)
-                               (remove empty?)
-                               (map split-japanese-sentence)))
-                       flatten
-                       (into []))))
+           (map (fn [paragraph]
+                  (into []
+                        (comp (filter identity)
+                              (remove empty?)
+                              (mapcat split-japanese-sentence))
+                        paragraph)))
            (remove (partial every? empty?)))                ; Remove paragraph boundaries.
          lines)))
 
@@ -110,13 +108,15 @@
   (into [] (map #(hash-map :paragraph/tags #{} :paragraph/sentences %) paragraphs)))
 
 (defn parse-document
+  "Tokenizes sentences in doc using given token-fn. This is implemented using r/reduce instead of r/fold because
+  token-fn is not always thread-safe."
   [doc token-fn]
   (->> doc
        :document/paragraphs
        (r/mapcat :paragraph/sentences)
        (r/map parse/parse-sentence)
        (r/reduce (fn
-                   ([] [])                                  ;; FIXME ending with long seq of "/" ???? -> fold was causing us trouble!
+                   ([] [])
                    ([a b] (into a (r/map token-fn b)))))))
 
 (s/fdef parse-document

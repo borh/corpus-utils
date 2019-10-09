@@ -5,8 +5,8 @@
             [clojure.java.io :as io]
             [me.raynes.fs :as fs]
             [clojure.spec.alpha :as s]
-            [corpus-utils.utils :as utils]
-            [corpus-utils.document])
+            [corpus-utils.document]
+            [corpus-utils.ndc :as ndc])
   (:import [fast_zip.core ZipperLocation]
            (java.io File)))
 
@@ -57,9 +57,6 @@
   :args (s/cat :m #(instance? ZipperLocation %))
   :ret (s/coll-of (s/coll-of string?)))
 
-;; FIXME Refactor this into its own thing, perhaps under a delay?
-(defonce ndc-map (into {} (utils/read-tsv-URL (io/resource "ndc-3digits.tsv") false)))
-
 (defn parse-document
   [corpus year number filename article-loc]
   (let [attrs (:attrs (fz/node article-loc))
@@ -69,27 +66,28 @@
         style (or (:文体 attrs) (:style attrs))
         script (or (:script attrs) "漢字かな")                  ;; TODO This can be a corpus-level attribute too. Meiroku is at this level, though. Is this a good default? Should keywordize this!
         genre (or (:ジャンル attrs) "")]
-    {:paragraphs
-     (->> article-loc
-          fz/down
-          (iterate fz/right)
-          (take-while (complement nil?))
-          ;;(take 2)
-          (mapcat partition-by-paragraph)
-          (map (fn [text] {:tags      #{}
-                           :sentences text}))
-          (into []))
-     :metadata
-     {:title     title
-      :author    author
-      :publisher corpus
-      :year      (try (Integer/parseInt year)
-                      (catch Exception e
-                        (println "Caught exception: " e)))
-      :basename  (fs/base-name filename ".xml")
-      :corpus    corpus
-      :script    script
-      :category  [(get ndc-map (str/replace genre #"^NDC" "") "分類なし")]}}))
+    #:document{:paragraphs
+               (->> article-loc
+                    fz/down
+                    (iterate fz/right)
+                    (take-while (complement nil?))
+                    ;;(take 2)
+                    (mapcat partition-by-paragraph)
+                    (map (fn [text] #:paragraph{:tags      #{}
+                                                :sentences text}))
+                    (into []))
+               :metadata
+               #:metadata{:permission true
+                          :title      title
+                          :author     author
+                          :publisher  corpus
+                          :year       (try (Integer/parseInt year)
+                                           (catch Exception e
+                                             (println "Caught exception: " e)))
+                          :basename   (fs/base-name filename ".xml")
+                          :corpus     corpus
+                          :script     script
+                          :category   (get ndc/ndc-map (str/replace genre #"^NDC" "") [])}}))
 
 (s/fdef parse-document
   :args (s/cat :corpus string? :year string? :number string? :filename #(instance? File %) :article-loc #(instance? ZipperLocation %))
@@ -124,5 +122,5 @@
        (mapcat parse-document-seq)))
 
 (s/fdef document-seq
-  :args (s/cat :options (s/keys :req-un [:corpus/dir string? :metadata/dir string?]))
+  :args (s/cat :options (s/keys :req-un [::corpus-dir string?]))
   :ret :corpus/documents)
