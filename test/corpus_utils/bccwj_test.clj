@@ -12,7 +12,7 @@
 
 (def options
   {:metadata-dir "/home/bor/Projects/bccwj/DOC/"
-   :corpus-dir   "/home/bor/Projects/bccwj/C-XML/VARIABLE/OB/OB.zip"})
+   :corpus-dir   "/home/bor/Projects/bccwj/C-XML/VARIABLE/"})
 
 (deftest parse-metadata-test
   (let [m (vals (parse-metadata (:metadata-dir options)))]

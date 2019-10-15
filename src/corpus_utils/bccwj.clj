@@ -119,7 +119,6 @@
                             :down (conj tag-stack coded-tag)
                             :same (if (= :br tag) tag-stack (conj (pop tag-stack) coded-tag)) ; :br is an exception as a paragraph break, as it does not increase XML tree depth
                             ((apply comp (repeat next-direction pop)) tag-stack))] ; Discard equal to up depth.
-        #_(println next-direction tag coded-tag new-tag-stack)
         (recur
           (or xml-loc-down xml-loc-right (:loc xml-loc-up)) ; Same as (fz/next xml-loc).
           new-tag-stack
@@ -137,8 +136,7 @@
                 :else par-loc))))))                         ; Do nothing.
 
 (s/fdef walk-and-emit
-  :args (s/cat :paragraph-level-tags set? :xml-data any?)
-  :ret :document/paragraphs)
+  :args (s/cat :paragraph-level-tags set? :xml-data any?))
 
 (defn parse-document
   [stream corpus]
@@ -343,14 +341,22 @@
 
 (defn document-seq
   [options]
-  (let [metadata (parse-metadata (:metadata-dir options))]
-    (utils/walk-zip-file
-      (fn [basename text]
-        (if-let [meta (get metadata basename)]
-          #:document{:metadata   meta
-                     :paragraphs (parse-document text (:metadata/subcorpus meta))}
-          (throw (ex-info "Missing metadata for BCCWJ basename" {:basename basename}))))
-      (:corpus-dir options))))
+  (let [metadata (parse-metadata (:metadata-dir options))
+        corpus-zips (mapcat identity
+                            (fs/walk
+                              (fn [root dirs files]
+                                (for [file files]
+                                  (if (= ".zip" (fs/extension file))
+                                    (fs/file root file))))
+                              (:corpus-dir options)))]
+    (mapcat
+      (partial utils/walk-zip-file
+               (fn [basename text]
+                 (if-let [meta (get metadata basename)]
+                   #:document{:metadata   meta
+                              :paragraphs (parse-document text (:metadata/subcorpus meta))}
+                   (throw (ex-info "Missing metadata for BCCWJ basename" {:basename basename})))))
+      corpus-zips)))
 
 (s/fdef document-seq
   :args (s/cat :options (s/keys :req-un [::corpus-dir string? ::metadata-dir string?]))
