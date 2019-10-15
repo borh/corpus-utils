@@ -47,7 +47,7 @@
         records))))
 
 (s/fdef read-tsv
-  :args (s/cat :file string? :header? boolean?)
+  :args (s/cat :file (s/or :string string? :file #(instance? java.io.File %)) :header? boolean?)
   :ret (s/coll-of (s/coll-of string?)))
 
 (defn read-csv

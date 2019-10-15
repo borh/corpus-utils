@@ -3,6 +3,7 @@
     [fast-zip.core :as fz]
     [clojure.xml :as xml]
     [clojure.java.io :as io]
+    [me.raynes.fs :as fs]
     [clojure.string :as string]
     [clojure.core.reducers :as r]
     ;;[org.httpkit.client :as http]
@@ -181,9 +182,9 @@
 
 (defn parse-metadata
   [metadata-dir]
-  (let [metadata (utils/read-tsv (str metadata-dir "Joined_info.txt") true)
-        fixed-ndc (utils/read-tsv (str metadata-dir "BCCWJ-NDC.txt") true)
-        copyright (into {} (utils/read-tsv (str metadata-dir "CopyRight_Annotation.txt") true))
+  (let [metadata (utils/read-tsv (fs/file metadata-dir "Joined_info.txt") true)
+        fixed-ndc (utils/read-tsv (fs/file metadata-dir "BCCWJ-NDC.txt") true)
+        copyright (into {} (utils/read-tsv (fs/file metadata-dir "CopyRight_Annotation.txt") true))
         c-map (into {} (x/for [[k1 v1] (c-code "1")
                                [k2 v2] (c-code "2")
                                [k3 v3] (c-code "34")]
