@@ -221,7 +221,39 @@
                   genre-1 genre-2 genre-3 genre-4 _ _
                   author author-year author-gender corpus-name]]
               (let [metadata-patch? (if-let [v (get ndc-metadata basename)] v false)
-                    [genre-1 genre-2 genre-3 genre-4] (if metadata-patch? metadata-patch? [genre-1 genre-2 genre-3 genre-4])]
+                    [genre-1 genre-2 genre-3 genre-4] (if metadata-patch? metadata-patch? [genre-1 genre-2 genre-3 genre-4])
+                    category (->> (condp re-seq corpus-name
+                                    #"(L|O|P)B" (->> [genre-1 genre-2]
+                                                     (r/remove #(or (= "なし" %)
+                                                                    (= "分類なし" %)))
+                                                     (r/mapcat #(ndc/ndc-map % [%]))
+                                                     (r/map #(string/replace % #"^\d\s" ""))
+                                                     (r/mapcat #(condp re-seq %
+
+                                                                  #"^(\d+)\.(\d+)$"
+                                                                  (let [[[_ top-level extra] & _] (re-seq #"^(\d+)\.(\d+)$" %)]
+                                                                    ;; We fallback on the top-level NDC concept if no direct match is found.
+                                                                    (get ndc/ndc-map top-level))
+
+                                                                  #"^[\d\s]+$"
+                                                                  (do (println "Removing unknown category: " basename genre-1 genre-2)
+                                                                      [nil])
+
+                                                                  [%]))
+                                                     (r/remove nil?))
+                                    #"OL" (r/map #(string/replace % #"\d\d\s" "")
+                                                 [genre-1 genre-2 genre-3 genre-4])
+                                    #"OT" [genre-1 (str "G" (case genre-2
+                                                              "小" (Integer/parseInt genre-3)
+                                                              "中" (+ 6 (Integer/parseInt genre-3))
+                                                              "高" 10))]
+                                    [genre-1 genre-2 genre-3 genre-4])
+                                  (r/remove empty?)
+                                  (r/reduce (fn             ;; Remove repeated categories.
+                                              ([] [])
+                                              ([a b] (if (= (peek a) b) a (conj a b)))))
+                                  (concat [(name-map corpus-name)])
+                                  (into []))]
                 (assoc m basename
                          #:metadata{:permission  true
                                     :title       (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
@@ -243,38 +275,8 @@
                                     :basename    basename
                                     :corpus      "BCCWJ"
                                     :subcorpus   (name-map corpus-name)
-                                    :category    (->> (condp re-seq corpus-name
-                                                        #"(L|O|P)B" (->> [genre-1 genre-2]
-                                                                         (r/remove #(or (= "なし" %)
-                                                                                        (= "分類なし" %)))
-                                                                         (r/mapcat #(ndc/ndc-map % [%]))
-                                                                         (r/map #(string/replace % #"^\d\s" ""))
-                                                                         (r/mapcat #(condp re-seq %
-
-                                                                                      #"^(\d+)\.(\d+)$"
-                                                                                      (let [[[_ top-level extra] & _] (re-seq #"^(\d+)\.(\d+)$" %)]
-                                                                                        ;; We fallback on the top-level NDC concept if no direct match is found.
-                                                                                        (get ndc/ndc-map top-level))
-
-                                                                                      #"^[\d\s]+$"
-                                                                                      (do (println "Removing unknown category: " basename genre-1 genre-2)
-                                                                                          [nil])
-
-                                                                                      [%]))
-                                                                         (r/remove nil?))
-                                                        #"OL" (r/map #(string/replace % #"\d\d\s" "")
-                                                                     [genre-1 genre-2 genre-3 genre-4])
-                                                        #"OT" [genre-1 (str "G" (case genre-2
-                                                                                  "小" (Integer/parseInt genre-3)
-                                                                                  "中" (+ 6 (Integer/parseInt genre-3))
-                                                                                  "高" 10))]
-                                                        [genre-1 genre-2 genre-3 genre-4])
-                                                      (r/remove empty?)
-                                                      (r/reduce (fn ;; Remove repeated categories.
-                                                                  ([] [])
-                                                                  ([a b] (if (= (peek a) b) a (conj a b)))))
-                                                      (concat [(name-map corpus-name)])
-                                                      (into []))})))
+                                    :category    category
+                                    :genre       category})))
             (fn [] {}))
           metadata)
 
