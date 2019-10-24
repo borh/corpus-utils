@@ -8,7 +8,7 @@
             [corpus-utils.document]
             [corpus-utils.ndc :as ndc])
   (:import [fast_zip.core ZipperLocation]
-           (java.io File)))
+           [java.io File]))
 
 ;; :sentence -> :s
 ;; + metadata is in file
@@ -94,7 +94,7 @@
   :ret :corpus/document)
 
 (defn parse-document-seq
-  "Each XML file from The Sun corpus contains several articles, so we return a vector of documents."
+  "Each XML file from The Sun corpus contains several articles, so we return a sequence of documents."
   [filename]
   (let [root-loc (-> filename
                      io/input-stream
