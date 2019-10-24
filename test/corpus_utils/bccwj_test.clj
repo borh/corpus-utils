@@ -11,8 +11,8 @@
 (alter-var-root #'s/*explain-out* (constantly (expound/custom-printer {:show-valid-values? true :print-specs? false :theme :figwheel-theme})))
 
 (def options
-  {:metadata-dir "/home/bor/Projects/bccwj/DOC/"
-   :corpus-dir   "/home/bor/Projects/bccwj/C-XML/VARIABLE/"})
+  {:metadata-dir "/home/bor/Projects/bccwj/DOC"
+   :corpus-dir   "/home/bor/Projects/bccwj/C-XML/VARIABLE"})
 
 (deftest parse-metadata-test
   (let [m (vals (parse-metadata (:metadata-dir options)))]
