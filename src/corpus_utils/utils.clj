@@ -3,10 +3,16 @@
             [clojure.java.io :as io]
             [clojure.data.csv :as csv]
             [me.raynes.fs :as fs]
-            [clojure.string :as string])
+            [clojure.edn :as edn]
+            [net.cgrand.xforms.rfs :as rfs]
+            [net.cgrand.xforms :as x])
   (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream XZCompressorOutputStream]
+           [org.apache.commons.compress.compressors.zstandard ZstdCompressorInputStream ZstdCompressorOutputStream]
            [java.net URL]
-           [org.apache.commons.compress.archivers.zip ZipFile ZipArchiveEntry]))
+           [net.openhft.hashing LongHashFunction]
+           [org.apache.commons.compress.archivers.zip ZipFile ZipArchiveEntry]
+           [java.io File PushbackReader]
+           [org.apache.commons.compress.utils IOUtils]))
 
 (defn xz-reader [filename]
   (-> filename
@@ -20,13 +26,15 @@
       XZCompressorOutputStream.
       io/writer))
 
+(defn zstd-input-stream [filename]
+  (-> filename
+      io/input-stream
+      ZstdCompressorInputStream.))
+
 (defn read-tsv-xz
   [file header?]
   (let [records
-        (with-open [r (-> file
-                          io/input-stream
-                          XZCompressorInputStream.
-                          io/reader)]
+        (with-open [r (xz-reader file)]
           (doall (csv/read-csv r :separator \tab :quote 0)))]
     (vec
       (if header?
@@ -47,7 +55,7 @@
         records))))
 
 (s/fdef read-tsv
-  :args (s/cat :file (s/or :string string? :file #(instance? java.io.File %)) :header? boolean?)
+  :args (s/cat :file (s/or :string string? :file #(instance? File %)) :header? boolean?)
   :ret (s/coll-of (s/coll-of string?)))
 
 (defn read-csv
@@ -95,15 +103,60 @@
     (doseq [[k vs] map-seq]
       (clojure.data.csv/write-csv out-file [(apply conj k (for [sh sparse-header] (get vs sh 0.0)))] :separator \tab))))
 
-(defn walk-zip-file
-  [apply-fn path & {:keys [extension] :or {extension ".xml"}}]
-  (with-open [z (ZipFile. (fs/file path))]
-    (let [files (enumeration-seq (.getEntries z))]
-      (doall (for [file files
-                   :let [filename (.getName ^ZipArchiveEntry file)]
-                   :when (and (not (.isDirectory file)) (= extension (string/lower-case (fs/extension filename))))]
-               (apply-fn (fs/base-name filename true) (.getInputStream z file)))))))
+(def hash-object (LongHashFunction/xx))
 
-#_(s/fdef walk-zip-file
-  ;; :args (s/cat :apply-fn fn? :zip-file string?)
-  :ret (s/coll-of #(instance? InputStream %)))
+(defn hash-file-path [file]
+  (let [;; file (.getCanonicalFile (fs/file path))
+        basename (fs/base-name file true)
+        unique-identifier (str basename "_" (.length file) "_" (.lastModified file))
+        hash-long (.hashChars hash-object unique-identifier)
+        hash-str (format "%02x" hash-long)
+        cache-dir-path (fs/file "." "cache" (str basename "-" hash-str))]
+    cache-dir-path))
+
+(defn zipfile-cached-files
+  "Returns a sequence of locally cached and compressed files in the Zip file at path. Files are cached in the 'cache'
+  directory and will be recreated if deleted. Currently, all files are compressed with Zstandard compression."
+  [path]
+  (let [zf (fs/file path)
+        cache-dir-path (hash-file-path path)]
+    (when-not (fs/exists? cache-dir-path)
+      (fs/mkdirs cache-dir-path))
+    (with-open [z (ZipFile. zf)]
+      (doseq [^ZipArchiveEntry ze (enumeration-seq (.getEntries z))
+              :let [ze-name (fs/file cache-dir-path (.getName ze))
+                    ze-path (fs/file cache-dir-path (str (fs/base-name ze-name) ".zstd"))]
+              :when (and (not (fs/exists? ze-path))         ;; Do not recreate cache file if existing.
+                         (not (.isDirectory ze)))]
+        (with-open [zis (.getInputStream z ze)
+                    wos (-> ze-path
+                            io/output-stream
+                            ZstdCompressorOutputStream.)]
+          (IOUtils/copy zis wos))))
+    (fs/glob cache-dir-path "*.zstd")))
+
+(defn cache-processed-file!
+  "Given an existing cache dir and basename, and parsed EDN data of given file, writes a compressed file containing
+   the pre-processed EDN to the cache."
+  [cache-dir-path basename edn-data]
+  (let [edn-str (pr-str edn-data)
+        hash-str (format "%02x" (.hashChars hash-object edn-str))]
+    (with-open [w (-> (fs/file cache-dir-path (str basename "-" hash-str ".edn.zstd"))
+                      io/output-stream
+                      ZstdCompressorOutputStream.
+                      io/writer)]
+      (.write w edn-str))))
+
+(defn read-edn [path]
+  (with-open [in (io/reader path)]
+    (edn/read (PushbackReader. in))))
+
+(defn get-processed-file
+  "Returns the most recently created EDN data of given basename in cache-dir-path."
+  [cache-dir-path basename]
+  (if-let [edn-path (reduce rfs/max (map (fn [f] (.lastModified f))
+                                         (fs/glob cache-dir-path (str basename "-*.edn.zstd"))))]
+    (read-edn edn-path)))
+
+(defn clear-cache! []
+  (fs/delete-dir (fs/file "." "cache")))

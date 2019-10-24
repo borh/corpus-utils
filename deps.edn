@@ -3,10 +3,13 @@
            fast-zip                            {:mvn/version "0.6.1" :exclusions [com.cemerick/austin]}
            org.clojure/data.csv                {:mvn/version "0.1.4"}
            me.raynes/fs                        {:mvn/version "1.4.6"}
+           net.openhft/zero-allocation-hashing {:mvn/version "0.9"}
            org.apache.commons/commons-compress {:mvn/version "1.19"}
+           com.github.luben/zstd-jni           {:mvn/version "1.4.3-1"}
            org.tukaani/xz                      {:mvn/version "1.8"}
            com.ibm.icu/icu4j                   {:mvn/version "65.1"}
            net.cgrand/xforms                   {:mvn/version "0.19.2"}
+           parallel                            {:mvn/version "0.10"}
            arachne-framework/aristotle         {:git/url "https://github.com/arachne-framework/aristotle"
                                                 :sha     "7b93e62abc45c82c75d5cf6c0ae2c0e21a233e81"
                                                 #_:exclusions #_[org.apache.jena/apache-jena-libs]}
