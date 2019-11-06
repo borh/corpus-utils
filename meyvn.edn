@@ -1,6 +1,6 @@
 {:pom       {:group-id    "corpus-utils"
              :artifact-id "corpus-utils"
-             :version     "0.3.6"
+             :version     "0.3.7"
              :name        "Utilities for preprocessing various Japanese corpora."}
  :packaging {:uberjar {:enabled false}
              :jar     {:enabled           true
