@@ -4,7 +4,9 @@
             [corpus-utils.document :refer :all]
             [clojure.spec.alpha :as s]
             [net.cgrand.xforms :as x]
-            [clojure.string :as string]))
+            [parallel.xf :as xf]
+            [clojure.string :as string]
+            [me.raynes.fs :as fs]))
 
 (defn is-open? [s]
   (re-seq #"^<doc id" s))
@@ -107,16 +109,23 @@
 (defn document-seq
   "Given a suitable (quasi)XML file generated from a Wikipedia dump, returns a lazy sequence of maps containing sources meta-information and parsed paragraphs."
   [{:keys [corpus-dir]}]
-  (let [[year _month _day] (rest (first (re-seq #"(\d\d\d\d)(\d\d)(\d\d).+\.xml.*$" corpus-dir)))
-        wikipedia-metadata #:metadata{:year (Integer/parseInt year)}
-        lines (line-seq (utils/xz-reader corpus-dir))]
-    (sequence
-      (comp
-        (partition-by is-open?)
-        (partition-all 2)
-        (filter is-japanese?)
-        (map (partial process-doc wikipedia-metadata)))
-      lines)))
+  (let [cache-dir-path (utils/hash-file-path (fs/file corpus-dir))]
+    (if (fs/exists? cache-dir-path)
+      (map utils/read-cached-file (fs/glob cache-dir-path "*.transit"))
+      (let [[year _month _day] (rest (first (re-seq #"(\d\d\d\d)(\d\d)(\d\d).+\.xml.*$" corpus-dir)))
+            wikipedia-metadata #:metadata{:year (Integer/parseInt year)}
+            lines (line-seq (utils/xz-reader corpus-dir))]
+        (fs/mkdirs cache-dir-path)
+        (sequence
+          (comp
+            (partition-by is-open?)
+            (partition-all 2)
+            (filter is-japanese?)
+            (xf/pmap (partial process-doc wikipedia-metadata))
+            (map (fn [doc]
+                       (future (utils/cache-processed-file! cache-dir-path (:metadata/basename (:document/metadata doc)) doc))
+                       doc)))
+          lines)))))
 
 (s/fdef document-seq
   :args (s/cat :options (s/keys :req-un [::corpus-dir string?]))
