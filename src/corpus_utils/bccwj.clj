@@ -8,6 +8,7 @@
     [clojure.core.reducers :as r]
     ;;[org.httpkit.client :as http]
     [net.cgrand.xforms :as x]
+    [parallel.xf :as xf]
     [clojure.spec.alpha :as s]
     [corpus-utils.ndc :as ndc]
     [corpus-utils.c-code :refer [c-code]]
@@ -147,14 +148,14 @@
                       xml/parse
                       (walk-and-emit p-tags))]
     (into []
-          (comp (map #(hash-map                             ; Remove nils/empty strings from :tags and :sentences.
-                        :paragraph/tags (into #{} (filter identity) (:tags %))
-                        :paragraph/sentences (into [] (remove empty?) (:paragraph/sentences %))))
+          (comp (map (fn [doc]                              ; Remove nils/empty strings from :tags and :sentences.
+                       {:paragraph/tags      (into #{} (filter identity) (:paragraph/tags doc))
+                        :paragraph/sentences (into [] (remove empty?) (:paragraph/sentences doc))}))
                 (remove #(empty? (:paragraph/sentences %)))) ; Remove paragraphs with no sentences.
           document)))
 
 (s/fdef parse-document
-  :args (s/cat :stream #(instance? InputStream %) :corpus string?)
+  :args (s/cat :stream any? #_#(instance? InputStream %) :corpus string?)
   :ret :document/paragraphs)
 
 ;; ## Metadata
@@ -220,7 +221,9 @@
                  [basename _ title subtitle _ _ publisher year isbn _
                   genre-1 genre-2 genre-3 genre-4 _ _
                   author author-year author-gender corpus-name]]
-              (let [metadata-patch? (if-let [v (get ndc-metadata basename)] v false)
+              (let [title (string/trim title)
+                    subtitle (string/trim subtitle)
+                    metadata-patch? (if-let [v (get ndc-metadata basename)] v false)
                     [genre-1 genre-2 genre-3 genre-4] (if metadata-patch? metadata-patch? [genre-1 genre-2 genre-3 genre-4])
                     category (->> (condp re-seq corpus-name
                                     #"(L|O|P)B" (->> [genre-1 genre-2]
@@ -252,11 +255,12 @@
                                   (r/reduce (fn             ;; Remove repeated categories.
                                               ([] [])
                                               ([a b] (if (= (peek a) b) a (conj a b)))))
-                                  (concat [(name-map corpus-name)])
-                                  (into []))]
+                                  (into [(name-map corpus-name)]))]
                 (assoc m basename
                          #:metadata{:permission  true
-                                    :title       (str title (if-not (= "" (string/trim subtitle)) ": " subtitle))
+                                    :title       (str title (if-not (empty? subtitle)
+                                                              (str ": " subtitle)
+                                                              ""))
                                     :author      author
                                     :gender      (let [authors (string/split author-gender #"/")]
                                                    (if (every? #(= (first authors) %) authors)
@@ -351,14 +355,19 @@
                                   (if (= ".zip" (fs/extension file))
                                     (fs/file root file))))
                               (:corpus-dir options)))]
-    (mapcat
-      (partial utils/walk-zip-file
-               (fn [basename text]
-                 (if-let [meta (get metadata basename)]
-                   #:document{:metadata   meta
-                              :paragraphs (parse-document text (:metadata/subcorpus meta))}
-                   (throw (ex-info "Missing metadata for BCCWJ basename" {:basename basename})))))
-      corpus-zips)))
+    (sequence (comp (mapcat utils/zipfile-cached-files)
+                    (xf/pmap (fn [cf]
+                               (let [basename (-> cf (fs/base-name true) (fs/base-name true) (string/replace #"-.+$" ""))
+                                     cache-dir-path (fs/parent cf)]
+                                 (if-let [doc (utils/get-processed-file cache-dir-path basename)]
+                                   doc
+                                   (let [meta (get metadata basename)
+                                         doc #:document{:metadata   meta
+                                                        :paragraphs (parse-document (utils/zstd-input-stream cf)
+                                                                                    (:metadata/subcorpus meta))}]
+                                     (future (utils/cache-processed-file! cache-dir-path basename doc))
+                                     doc))))))
+              corpus-zips)))
 
 (s/fdef document-seq
   :args (s/cat :options (s/keys :req-un [::corpus-dir string? ::metadata-dir string?]))
