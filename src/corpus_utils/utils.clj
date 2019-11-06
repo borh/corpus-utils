@@ -3,15 +3,13 @@
             [clojure.java.io :as io]
             [clojure.data.csv :as csv]
             [me.raynes.fs :as fs]
-            [clojure.edn :as edn]
-            [net.cgrand.xforms.rfs :as rfs]
-            [net.cgrand.xforms :as x])
+            [cognitect.transit :as transit])
   (:import [org.apache.commons.compress.compressors.xz XZCompressorInputStream XZCompressorOutputStream]
            [org.apache.commons.compress.compressors.zstandard ZstdCompressorInputStream ZstdCompressorOutputStream]
            [java.net URL]
            [net.openhft.hashing LongHashFunction]
            [org.apache.commons.compress.archivers.zip ZipFile ZipArchiveEntry]
-           [java.io File PushbackReader]
+           [java.io File]
            [org.apache.commons.compress.utils IOUtils]))
 
 (defn xz-reader [filename]
@@ -106,8 +104,7 @@
 (def hash-object (LongHashFunction/xx))
 
 (defn hash-file-path [file]
-  (let [;; file (.getCanonicalFile (fs/file path))
-        basename (fs/base-name file true)
+  (let [basename (fs/base-name file true)
         unique-identifier (str basename "_" (.length file) "_" (.lastModified file))
         hash-long (.hashChars hash-object unique-identifier)
         hash-str (format "%02x" hash-long)
@@ -116,7 +113,8 @@
 
 (defn zipfile-cached-files
   "Returns a sequence of locally cached and compressed files in the Zip file at path. Files are cached in the 'cache'
-  directory and will be recreated if deleted. Currently, all files are compressed with Zstandard compression."
+  directory and will be recreated if deleted. Currently, all files are compressed with Zstandard compression. Note
+  that file names will have their hash value appended after their basename but before any extensions."
   [path]
   (let [zf (fs/file path)
         cache-dir-path (hash-file-path path)]
@@ -139,24 +137,27 @@
   "Given an existing cache dir and basename, and parsed EDN data of given file, writes a compressed file containing
    the pre-processed EDN to the cache."
   [cache-dir-path basename edn-data]
-  (let [edn-str (pr-str edn-data)
-        hash-str (format "%02x" (.hashChars hash-object edn-str))]
-    (with-open [w (-> (fs/file cache-dir-path (str basename "-" hash-str ".edn.zstd"))
-                      io/output-stream
-                      ZstdCompressorOutputStream.
-                      io/writer)]
-      (.write w edn-str))))
+  (with-open [w (-> (fs/file cache-dir-path (str basename #_"-" #_hash-str ".transit"))
+                    io/output-stream
+                    #_ZstdCompressorOutputStream.
+                    (transit/writer :msgpack))]
+    (transit/write w edn-data)))
 
-(defn read-edn [path]
-  (with-open [in (io/reader path)]
-    (edn/read (PushbackReader. in))))
+(defn read-cached-file
+  "Returns the compressed transit data in file at path."
+  [path]
+  (with-open [is (io/input-stream path)]
+    (transit/read (transit/reader is :msgpack))))
 
 (defn get-processed-file
-  "Returns the most recently created EDN data of given basename in cache-dir-path."
+  "Returns the most recently created EDN data of given basename in cache-dir-path. Note we do not hash individual files
+  as it would be prohibitively expensive to find the newest file in a big file collection."
   [cache-dir-path basename]
-  (if-let [edn-path (reduce rfs/max (map (fn [f] (.lastModified f))
-                                         (fs/glob cache-dir-path (str basename "-*.edn.zstd"))))]
-    (read-edn edn-path)))
+  (let [edn-path (fs/file cache-dir-path (str basename ".transit"))
+        #_(first (sort-by (fn [f] (.lastModified f)) >
+                          (fs/glob cache-dir-path (str basename "-*.transit.zstd"))))]
+    (if (fs/exists? edn-path)
+      (read-cached-file edn-path))))
 
 (defn clear-cache! []
   (fs/delete-dir (fs/file "." "cache")))
