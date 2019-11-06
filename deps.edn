@@ -19,6 +19,7 @@
            org.glassfish.jaxb/jaxb-runtime     {:mvn/version "2.4.0-b180830.0438"}}
  :paths   ["src" "data"]
  :aliases {:test {:extra-paths ["test"]
+                  :jvm-opts    ["-Xms4g" "-Xmx4g"]
                   :extra-deps  {expound                {:mvn/version "0.7.2"}
                                 orchestra              {:mvn/version "2019.02.17-SNAPSHOT"}
                                 org.clojure/test.check {:mvn/version "0.10.0"}}}}}
