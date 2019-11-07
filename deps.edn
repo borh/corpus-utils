@@ -1,5 +1,5 @@
 {:deps    {org.clojure/clojure                 {:mvn/version "1.10.1"}
-           clj-mecab                           {:mvn/version "0.4.25"}
+           clj-mecab                           {:mvn/version "0.4.27"}
            fast-zip                            {:mvn/version "0.6.1" :exclusions [com.cemerick/austin]}
            org.clojure/data.csv                {:mvn/version "0.1.4"}
            me.raynes/fs                        {:mvn/version "1.4.6"}
