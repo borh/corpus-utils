@@ -26,7 +26,7 @@
 
 (deftest document-seq-test
   (testing "document parsing"
-    (doseq [doc (take 10 (document-seq options))]
+    (doseq [doc (take 10 (time (document-seq options)))]
       (is (pos? (count (:document/paragraphs doc))))
       (is (s/valid? :corpus/document doc)))))
 

@@ -1,14 +1,14 @@
 {:deps    {org.clojure/clojure                 {:mvn/version "1.10.1"}
-           clj-mecab                           {:mvn/version "0.4.27"}
+           clj-mecab                           {:mvn/version "1.0.0"}
            fast-zip                            {:mvn/version "0.6.1" :exclusions [com.cemerick/austin]}
-           org.clojure/data.csv                {:mvn/version "0.1.4"}
+           org.clojure/data.csv                {:mvn/version "1.0.0"}
            me.raynes/fs                        {:mvn/version "1.4.6"}
-           net.openhft/zero-allocation-hashing {:mvn/version "0.9"}
-           org.apache.commons/commons-compress {:mvn/version "1.19"}
-           com.github.luben/zstd-jni           {:mvn/version "1.4.3-1"}
+           net.openhft/zero-allocation-hashing {:mvn/version "0.11"}
+           org.apache.commons/commons-compress {:mvn/version "1.20"}
+           com.github.luben/zstd-jni           {:mvn/version "1.4.4-7"}
            org.tukaani/xz                      {:mvn/version "1.8"}
-           com.cognitect/transit-clj           {:mvn/version "0.8.319"}
-           com.ibm.icu/icu4j                   {:mvn/version "65.1"}
+           com.cognitect/transit-clj           {:mvn/version "1.0.324"}
+           com.ibm.icu/icu4j                   {:mvn/version "66.1"}
            net.cgrand/xforms                   {:mvn/version "0.19.2"}
            parallel                            {:mvn/version "0.10"}
            arachne-framework/aristotle         {:git/url "https://github.com/arachne-framework/aristotle"
